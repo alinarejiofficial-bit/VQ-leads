@@ -4,12 +4,8 @@ import { api, type User, type DashboardStats, type DashboardCharts } from '../..
 import { LineChart } from '../../components/charts/CustomCharts';
 import { Card } from '../../components/common/Card';
 import { 
-  Sparkles, 
   ChevronDown, 
-  Download, 
-  Upload, 
   HelpCircle, 
-  CheckCircle,
   Video,
   MessageSquare,
   MoreVertical,
@@ -57,31 +53,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto text-left">
-      {/* Title Bar & AI Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-lg shadow-primary/10 hover:bg-primary/95 transition-all cursor-pointer">
-            <Sparkles size={14} /> Ask AI
-          </button>
-          <button className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-card border border-border text-foreground hover:bg-secondary/40 text-xs font-bold transition-all cursor-pointer">
-            Customize Widget
-          </button>
-          <div className="flex items-center gap-1.5 text-xs text-green-500 font-semibold md:ml-2">
-            <CheckCircle size={14} /> Last updated now
-          </div>
-          
-          <div className="h-5 w-[1px] bg-border mx-1 hidden md:block" />
-
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-semibold text-foreground hover:bg-secondary/40 transition-all cursor-pointer">
-            <Upload size={13} /> Imports <ChevronDown size={12} />
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-semibold text-foreground hover:bg-secondary/40 transition-all cursor-pointer">
-            <Download size={13} /> Exports <ChevronDown size={12} />
-          </button>
-        </div>
+      {/* Title Bar */}
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
       </div>
 
       {/* Row 1: KPI Top Row */}
