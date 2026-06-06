@@ -60,6 +60,20 @@ const DEMO_DATA = {
 
 export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [revenueTimeframe, setRevenueTimeframe] = useState<'1D' | '1W' | '1M' | '6M' | '1Y'>('1Y');
+  const [recentLeads, setRecentLeads] = useState(DEMO_DATA.recentLeads);
+
+  const handleClaimLead = (idx: number) => {
+    const newLeads = [...recentLeads];
+    newLeads[idx].owner = user.first_name || user.username || 'You';
+    newLeads[idx].status = 'Claimed';
+    setRecentLeads(newLeads);
+  };
+
+  const handleUpdateStatus = (idx: number, e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newLeads = [...recentLeads];
+    newLeads[idx].status = e.target.value;
+    setRecentLeads(newLeads);
+  };
 
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
@@ -459,10 +473,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                   <th className="p-4 font-bold">Status</th>
                   <th className="p-4 font-bold">Owner</th>
                   <th className="p-4 font-bold text-right">Value</th>
+                  <th className="p-4 font-bold text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {DEMO_DATA.recentLeads.map((lead, idx) => (
+                {recentLeads.map((lead, idx) => (
                   <tr key={idx} className="hover:bg-secondary/10 transition-colors">
                     <td className="p-4">
                       <span className="text-sm font-bold text-foreground">{lead.name}</span>
@@ -477,6 +492,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                         lead.status === 'Qualified' ? 'bg-cyan-500/10 text-cyan-500' :
                         lead.status === 'Claimed' ? 'bg-indigo-500/10 text-indigo-500' :
                         lead.status === 'Negotiation' ? 'bg-pink-500/10 text-pink-500' :
+                        lead.status === 'Won' || lead.status === 'Converted' ? 'bg-emerald-500/10 text-emerald-500' :
                         'bg-secondary text-muted-foreground'
                       }`}>
                         {lead.status}
@@ -496,6 +512,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                     </td>
                     <td className="p-4 text-right">
                       <span className="text-sm font-black text-emerald-500">{formatCompactCurrency(lead.value)}</span>
+                    </td>
+                    <td className="p-4 text-center">
+                      {lead.owner === 'Unassigned' ? (
+                        <button 
+                          onClick={() => handleClaimLead(idx)}
+                          className="px-3 py-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
+                        >
+                          Claim
+                        </button>
+                      ) : (
+                        <select 
+                          value={lead.status}
+                          onChange={(e) => handleUpdateStatus(idx, e)}
+                          className="px-2 py-1 bg-secondary text-foreground text-[10px] font-bold rounded-md border border-border cursor-pointer outline-none focus:ring-1 focus:ring-primary"
+                        >
+                          <option value="New">New</option>
+                          <option value="Claimed">Claimed</option>
+                          <option value="Contacted">Contacted</option>
+                          <option value="Qualified">Qualified</option>
+                          <option value="Negotiation">Negotiation</option>
+                          <option value="Won">Won</option>
+                          <option value="Lost">Lost</option>
+                        </select>
+                      )}
                     </td>
                   </tr>
                 ))}

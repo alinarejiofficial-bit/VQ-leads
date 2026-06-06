@@ -493,11 +493,38 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                 ) : (
                   <div className="flex flex-col gap-1 text-left">
                     <label className="text-xs font-semibold text-foreground">Owner</label>
-                    <Input 
-                      type="text" 
-                      disabled 
-                      value={lead.owner_name} 
-                    />
+                    {lead.owner ? (
+                      <Input 
+                        type="text" 
+                        disabled 
+                        value={lead.owner_name} 
+                      />
+                    ) : (
+                      <div className="flex gap-2">
+                        <Input 
+                          type="text" 
+                          disabled 
+                          value="Unassigned"
+                          className="flex-1"
+                        />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          className="border-primary/50 text-primary hover:bg-primary/10 whitespace-nowrap"
+                          onClick={async () => {
+                            try {
+                              await api.updateLead(lead.id, { owner: currentUser.id, status: 'CLAIMED' });
+                              onLeadUpdated();
+                              fetchLeadData();
+                            } catch(err) {
+                              alert('Failed to claim lead');
+                            }
+                          }}
+                        >
+                          Claim
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
 

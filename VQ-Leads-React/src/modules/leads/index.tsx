@@ -319,7 +319,24 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                     <TableCell>{l.company || '-'}</TableCell>
                     <TableCell>{l.source}</TableCell>
                     <TableCell className="font-semibold">${l.value}</TableCell>
-                    <TableCell>{l.owner_name || <span className="text-muted-foreground text-xs italic">Unassigned</span>}</TableCell>
+                    <TableCell>
+                      {l.owner_name ? l.owner_name : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground text-xs italic">Unassigned</span>
+                          {!isLeaderOrAdmin && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateLeadMutation.mutate({ id: l.id, data: { owner: user.id, status: 'CLAIMED' } });
+                              }}
+                              className="px-2 py-0.5 bg-primary/20 text-primary text-[10px] font-bold rounded hover:bg-primary/30 transition-colors"
+                            >
+                              Claim
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${(() => {
                         const colors = statusColors[l.status];
@@ -364,9 +381,25 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                       
                       <div className="flex justify-between items-center text-xs mt-2 pt-2.5 border-t border-border/40">
                         <span className="font-semibold text-foreground">${l.value}</span>
-                        <span className="text-[10px] bg-muted/40 border border-border/40 px-1.5 py-0.5 rounded text-muted-foreground max-w-[100px] truncate">
-                          {l.owner_name}
-                        </span>
+                        {l.owner_name ? (
+                          <span className="text-[10px] bg-muted/40 border border-border/40 px-1.5 py-0.5 rounded text-muted-foreground max-w-[100px] truncate">
+                            {l.owner_name}
+                          </span>
+                        ) : !isLeaderOrAdmin ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateLeadMutation.mutate({ id: l.id, data: { owner: user.id, status: 'CLAIMED' } });
+                            }}
+                            className="px-2 py-0.5 bg-primary/20 text-primary text-[10px] font-bold rounded hover:bg-primary/30 transition-colors"
+                          >
+                            Claim
+                          </button>
+                        ) : (
+                          <span className="text-[10px] bg-muted/40 border border-border/40 px-1.5 py-0.5 rounded text-muted-foreground italic">
+                            Unassigned
+                          </span>
+                        )}
                       </div>
 
 
