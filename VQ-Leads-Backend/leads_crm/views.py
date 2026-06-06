@@ -24,6 +24,11 @@ class IsAdminUserRole(permissions.BasePermission):
         return request.user.is_authenticated and hasattr(request.user, 'profile') and request.user.profile.role == 'ADMIN'
 
 
+class IsAdminOrLeaderUserRole(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and hasattr(request.user, 'profile') and request.user.profile.role in ['ADMIN', 'LEADER']
+
+
 class IsAdminOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
@@ -69,7 +74,14 @@ class AgentsView(APIView):
         return [permissions.IsAuthenticated()]
 
     def get(self, request):
-        agents = User.objects.filter(profile__role='AGENT', is_active=True)
+        user = request.user
+        if user.profile.role == 'ADMIN':
+            agents = User.objects.filter(profile__role='AGENT', is_active=True)
+        elif user.profile.role == 'LEADER':
+            led_teams = user.led_teams.all()
+            agents = User.objects.filter(sales_teams__in=led_teams, profile__role='AGENT', is_active=True).distinct()
+        else:
+            agents = User.objects.none()
         serializer = UserSerializer(agents, many=True)
         return Response(serializer.data)
 
@@ -115,6 +127,10 @@ class LeadViewSet(viewsets.ModelViewSet):
             return Lead.objects.none()
         if user.profile.role == 'ADMIN':
             return Lead.objects.all().order_by('-created_at')
+        if user.profile.role == 'LEADER':
+            led_teams = user.led_teams.all()
+            member_ids = User.objects.filter(sales_teams__in=led_teams).values_list('id', flat=True)
+            return Lead.objects.filter(Q(owner=user) | Q(owner_id__in=member_ids) | Q(owner__isnull=True)).order_by('-created_at')
         return Lead.objects.filter(owner=user).order_by('-created_at')
 
     def perform_create(self, serializer):
