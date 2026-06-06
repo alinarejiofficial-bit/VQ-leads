@@ -64,6 +64,7 @@ const LeaderOrAdminRoute: React.FC<LeaderOrAdminRouteProps> = ({ children }) => 
 // --- CORE APP ---
 function App() {
   const user = useAuthStore(state => state.user);
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
 
   return (
     <Router>
@@ -82,7 +83,7 @@ function App() {
         <Route 
           path="/login" 
           element={
-            user ? (
+            isAuthenticated ? (
               <Navigate to="/" replace />
             ) : (
               <AuthLayout>

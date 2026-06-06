@@ -123,6 +123,7 @@ export interface DashboardStats {
 export interface ChartTimelineItem {
   date: string;
   count: number;
+  convertedCount?: number;
 }
 
 export interface LeaderboardItem {

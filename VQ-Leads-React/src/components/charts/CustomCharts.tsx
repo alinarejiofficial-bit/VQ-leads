@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 interface LineChartData {
   date: string;
   count: number;
+  convertedCount?: number;
 }
 
 interface LineChartProps {
@@ -33,34 +34,44 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
   }, []);
 
   if (!data || data.length === 0) {
-    return <div className="empty-state">No timeline data available</div>;
+    return <div className="text-center text-xs text-muted-foreground py-10">No timeline data available</div>;
   }
 
   // Calculate scales
-  const maxVal = Math.max(...data.map(d => d.count), 5); // default at least 5 max
+  const maxVal = Math.max(...data.map(d => Math.max(d.count, d.convertedCount || 0)), 5);
   const minVal = 0;
   
   const points = data.map((d, index) => {
     const x = padding.left + (index / (data.length - 1)) * (width - padding.left - padding.right);
-    const y = height - padding.bottom - ((d.count - minVal) / (maxVal - minVal)) * (height - padding.top - padding.bottom);
-    return { x, y, ...d };
+    const y1 = height - padding.bottom - ((d.count - minVal) / (maxVal - minVal)) * (height - padding.top - padding.bottom);
+    const y2 = height - padding.bottom - (((d.convertedCount || 0) - minVal) / (maxVal - minVal)) * (height - padding.top - padding.bottom);
+    return { x, y1, y2, ...d };
   });
 
-  // Build path
-  let pathD = '';
-  let areaD = '';
-  
+  // Build path for Line 1 (Total Leads) - Green
+  let pathD1 = '';
+  let areaD1 = '';
   if (points.length > 0) {
-    pathD = `M ${points[0].x} ${points[0].y}`;
-    areaD = `M ${points[0].x} ${height - padding.bottom}`;
-    
+    pathD1 = `M ${points[0].x} ${points[0].y1}`;
+    areaD1 = `M ${points[0].x} ${height - padding.bottom}`;
     for (let i = 1; i < points.length; i++) {
-      pathD += ` L ${points[i].x} ${points[i].y}`;
+      pathD1 += ` L ${points[i].x} ${points[i].y1}`;
     }
-    
-    // Complete area path
-    areaD += pathD.substring(1);
-    areaD += ` L ${points[points.length - 1].x} ${height - padding.bottom} Z`;
+    areaD1 += pathD1.substring(1);
+    areaD1 += ` L ${points[points.length - 1].x} ${height - padding.bottom} Z`;
+  }
+
+  // Build path for Line 2 (Converted Leads) - Blue
+  let pathD2 = '';
+  let areaD2 = '';
+  if (points.length > 0) {
+    pathD2 = `M ${points[0].x} ${points[0].y2}`;
+    areaD2 = `M ${points[0].x} ${height - padding.bottom}`;
+    for (let i = 1; i < points.length; i++) {
+      pathD2 += ` L ${points[i].x} ${points[i].y2}`;
+    }
+    areaD2 += pathD2.substring(1);
+    areaD2 += ` L ${points[points.length - 1].x} ${height - padding.bottom} Z`;
   }
 
   // Draw grid lines
@@ -77,7 +88,6 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     
-    // Find closest point
     let closestIdx = 0;
     let minDiff = Infinity;
     
@@ -92,37 +102,51 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
     setHoverIndex(closestIdx);
     setTooltipPos({
       x: points[closestIdx].x + rect.left - containerRef.current.getBoundingClientRect().left,
-      y: points[closestIdx].y - 40
+      y: Math.min(points[closestIdx].y1, points[closestIdx].y2) - 50
     });
   };
 
   return (
-    <div ref={containerRef} className="chart-container">
+    <div ref={containerRef} className="relative w-full h-[220px]">
       {hoverIndex !== null && points[hoverIndex] && (
         <div 
-          className="chart-tooltip"
+          className="absolute z-10 bg-card/95 border border-border px-3 py-2 rounded-lg shadow-lg pointer-events-none text-left min-w-[120px]"
           style={{
-            opacity: 1,
             left: `${tooltipPos.x}px`,
             top: `${tooltipPos.y}px`,
             transform: 'translateX(-50%)',
             transition: 'left 0.1s ease, top 0.1s ease'
           }}
         >
-          <strong>{points[hoverIndex].count} Leads</strong>
-          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{points[hoverIndex].date}</div>
+          <div className="text-[10px] font-bold text-muted-foreground mb-1">{points[hoverIndex].date}</div>
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="flex items-center gap-1 text-[#10b981] font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" /> Total:
+            </span>
+            <span className="font-bold text-foreground">{points[hoverIndex].count}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-xs mt-0.5">
+            <span className="flex items-center gap-1 text-[#3b82f6] font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6]" /> Converted:
+            </span>
+            <span className="font-bold text-foreground">{points[hoverIndex].convertedCount || 0}</span>
+          </div>
         </div>
       )}
 
       <svg 
-        className="svg-chart" 
+        className="w-full h-full overflow-visible" 
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoverIndex(null)}
       >
         <defs>
-          <linearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.0" />
+          <linearGradient id="totalGlow" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+          </linearGradient>
+          <linearGradient id="convertedGlow" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
           </linearGradient>
         </defs>
 
@@ -141,9 +165,10 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
             <text 
               x={padding.left - 10} 
               y={line.y + 4} 
-              fill="var(--text-muted)" 
+              fill="var(--muted-foreground)" 
               fontSize="10" 
               textAnchor="end"
+              className="font-medium font-sans"
             >
               {line.val}
             </text>
@@ -157,46 +182,64 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
             <text
               key={idx}
               x={p.x}
-              y={height - 10}
-              fill="var(--text-muted)"
+              y={height - 5}
+              fill="var(--muted-foreground)"
               fontSize="10"
               textAnchor="middle"
+              className="font-medium font-sans"
             >
               {p.date}
             </text>
           );
         })}
 
-        {/* Shaded Area */}
-        {areaD && (
-          <path d={areaD} fill="url(#chartGlow)" />
-        )}
+        {/* Shaded Areas */}
+        {areaD1 && <path d={areaD1} fill="url(#totalGlow)" />}
+        {areaD2 && <path d={areaD2} fill="url(#convertedGlow)" />}
 
-        {/* Main line */}
-        {pathD && (
+        {/* Lines */}
+        {pathD1 && (
           <path 
-            d={pathD} 
+            d={pathD1} 
             fill="none" 
-            stroke="var(--primary)" 
+            stroke="#10b981" 
+            strokeWidth="2.5" 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+          />
+        )}
+        {pathD2 && (
+          <path 
+            d={pathD2} 
+            fill="none" 
+            stroke="#3b82f6" 
             strokeWidth="2.5" 
             strokeLinecap="round" 
             strokeLinejoin="round" 
           />
         )}
 
-        {/* Points */}
-        {points.map((p, idx) => (
-          <circle 
-            key={idx}
-            cx={p.x}
-            cy={p.y}
-            r={hoverIndex === idx ? 6 : 3}
-            fill={hoverIndex === idx ? 'var(--primary)' : 'var(--background)'}
-            stroke="var(--primary)"
-            strokeWidth="2"
-            style={{ cursor: 'pointer', transition: 'r 0.1s ease' }}
-          />
-        ))}
+        {/* Points indicator on hover */}
+        {hoverIndex !== null && points[hoverIndex] && (
+          <>
+            <circle 
+              cx={points[hoverIndex].x}
+              cy={points[hoverIndex].y1}
+              r="6"
+              fill="#10b981"
+              stroke="#090a0f"
+              strokeWidth="2"
+            />
+            <circle 
+              cx={points[hoverIndex].x}
+              cy={points[hoverIndex].y2}
+              r="5"
+              fill="#3b82f6"
+              stroke="#090a0f"
+              strokeWidth="2"
+            />
+          </>
+        )}
       </svg>
     </div>
   );
@@ -216,21 +259,21 @@ interface DonutChartProps {
 
 export const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
   if (!data || data.length === 0 || data.every(d => d.value === 0)) {
-    return <div className="empty-state">No status data available</div>;
+    return <div className="text-center text-xs text-muted-foreground py-10">No source data available</div>;
   }
 
   const total = data.reduce((sum, item) => sum + item.value, 0);
   const size = 180;
-  const radius = 65;
-  const strokeWidth = 12;
+  const radius = 62;
+  const strokeWidth = 14;
   const circumference = 2 * Math.PI * radius;
   const center = size / 2;
 
   let accumulatedPercent = 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-      <div style={{ position: 'relative', width: size, height: size }}>
+    <div className="flex flex-row items-center justify-between gap-6 w-full p-2">
+      <div className="relative" style={{ width: size, height: size, flexShrink: 0 }}>
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
           <circle
             cx={center}
@@ -258,7 +301,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
                 strokeWidth={strokeWidth}
                 strokeDasharray={strokeDasharray}
                 strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
+                strokeLinecap="butt"
                 style={{ transition: 'stroke-dashoffset 0.5s ease' }}
               />
             );
@@ -274,26 +317,24 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
           flexDirection: 'column'
         }}>
           <span className="text-2xl font-bold text-foreground">{total}</span>
-          <span className="text-[10px] text-muted-foreground uppercase font-semibold">Leads</span>
+          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Total</span>
         </div>
       </div>
 
-      {/* Legend */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '1fr 1fr', 
-        gap: '12px 24px', 
-        width: '100%', 
-        padding: '0 16px',
-        boxSizing: 'border-box' 
-      }}>
-        {data.map((item, idx) => (
-          <div key={idx} className="flex items-center gap-2 text-xs text-left">
-            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-            <span className="text-muted-foreground flex-1 truncate">{item.label}</span>
-            <span className="font-semibold text-foreground">{item.value}</span>
-          </div>
-        ))}
+      {/* Legend on the Right */}
+      <div className="flex flex-col gap-2.5 flex-1 pr-2">
+        {data.map((item, idx) => {
+          const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
+          return (
+            <div key={idx} className="flex items-center justify-between text-xs w-full">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                <span className="text-muted-foreground font-semibold truncate max-w-[80px]">{item.label}</span>
+              </div>
+              <span className="font-bold text-foreground">{pct}%</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

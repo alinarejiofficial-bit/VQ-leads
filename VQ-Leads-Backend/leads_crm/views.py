@@ -528,14 +528,26 @@ class DashboardChartsView(APIView):
             count=Count('id')
         ).order_by('date')
 
+        daily_won = leads_qs.filter(
+            status='WON',
+            created_at__date__gte=start_date
+        ).annotate(
+            date=TruncDate('created_at')
+        ).values('date').annotate(
+            count=Count('id')
+        ).order_by('date')
+
         daily_map = {item['date'].strftime('%Y-%m-%d'): item['count'] for item in daily_leads if item['date']}
+        won_map = {item['date'].strftime('%Y-%m-%d'): item['count'] for item in daily_won if item['date']}
+
         leads_timeline = []
         curr = start_date
         while curr <= end_date:
             date_str = curr.strftime('%Y-%m-%d')
             leads_timeline.append({
                 'date': curr.strftime('%b %d'),
-                'count': daily_map.get(date_str, 0)
+                'count': daily_map.get(date_str, 0),
+                'convertedCount': won_map.get(date_str, 0)
             })
             curr += datetime.timedelta(days=1)
 

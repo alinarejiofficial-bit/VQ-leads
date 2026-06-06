@@ -14,6 +14,18 @@ export const useAuthStore = create<AuthState>((set) => {
   const savedToken = localStorage.getItem('vq_token');
   const savedUser = localStorage.getItem('vq_user');
   
+  if (typeof window !== 'undefined') {
+    window.addEventListener('auth_change', () => {
+      const token = localStorage.getItem('vq_token');
+      const user = localStorage.getItem('vq_user');
+      set({
+        token,
+        user: user ? JSON.parse(user) : null,
+        isAuthenticated: !!token
+      });
+    });
+  }
+
   return {
     user: savedUser ? JSON.parse(savedUser) : null,
     token: savedToken,
