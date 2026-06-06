@@ -2,7 +2,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.db.models import Count, Sum, Max, F, Q
@@ -40,10 +40,11 @@ class LoginView(APIView):
         password = request.data.get('password')
         user = authenticate(username=username, password=password)
         if user:
-            token, _ = Token.objects.get_or_create(user=user)
+            refresh = RefreshToken.for_user(user)
             serializer = UserSerializer(user)
             return Response({
-                'token': token.key,
+                'token': str(refresh.access_token),
+                'refresh': str(refresh),
                 'user': serializer.data
             })
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
@@ -51,10 +52,6 @@ class LoginView(APIView):
 
 class LogoutView(APIView):
     def post(self, request):
-        try:
-            request.user.auth_token.delete()
-        except:
-            pass
         return Response({'success': 'Logged out successfully'})
 
 
@@ -158,26 +155,11 @@ class LeadViewSet(viewsets.ModelViewSet):
                 description=f"Status changed from {old_status} to {updated_lead.status}."
             )
             
-            # Handle automatic commissions on WON status
+            # Handle automatic commissions on WON status asynchronously
             if updated_lead.status == 'WON':
                 if updated_lead.owner:
-                    # check if commission already exists
-                    if not Commission.objects.filter(lead=updated_lead, agent=updated_lead.owner).exists():
-                        rate = updated_lead.owner.profile.commission_rate
-                        amount = updated_lead.value * (rate / Decimal('100.0'))
-                        Commission.objects.create(
-                            lead=updated_lead,
-                            agent=updated_lead.owner,
-                            rate=rate,
-                            amount=amount,
-                            status='PENDING'
-                        )
-                        LeadActivity.objects.create(
-                            lead=updated_lead,
-                            user=None,
-                            activity_type='COMMISSION_CALCULATED',
-                            description=f"Commission of ${amount:.2f} ({rate}%) calculated for {updated_lead.owner.username}."
-                        )
+                    from .tasks import calculate_commission_task
+                    calculate_commission_task.delay(updated_lead.id)
             # If changed away from WON, delete any pending commissions
             elif old_status == 'WON':
                 Commission.objects.filter(lead=updated_lead, status='PENDING').delete()
@@ -303,33 +285,18 @@ class PublicFormSubmitView(APIView):
                 description=f"Form Submission Notes: {notes}"
             )
 
-        # Round Robin routing
-        assigned_user = None
+        # Round Robin routing via Celery background task
+        assigned_user_name = "Unassigned"
         if form.assignment_mode == 'ROUND_ROBIN':
-            # Round Robin logic
-            agents = User.objects.filter(profile__role='AGENT', is_active=True)
-            if agents.exists():
-                # Annotate agents with the time of their last assigned lead
-                agents = agents.annotate(last_assigned=Max('leads__created_at'))
-                # Order by last_assigned ascending, prioritizing those who never had a lead
-                selected_agent = agents.order_by(F('last_assigned').asc(nulls_first=True)).first()
-                if selected_agent:
-                    lead.owner = selected_agent
-                    lead.save()
-                    assigned_user = selected_agent
-                    
-                    LeadActivity.objects.create(
-                        lead=lead,
-                        user=None,
-                        activity_type='ASSIGNMENT',
-                        description=f"Automatically assigned to {selected_agent.username} via Round Robin."
-                    )
+            from .tasks import assign_lead_round_robin_task
+            assign_lead_round_robin_task.delay(lead.id)
+            assigned_user_name = "Routing in progress (Celery)..."
 
         serializer = LeadSerializer(lead)
         return Response({
             'success': True,
             'lead': serializer.data,
-            'assigned_to': assigned_user.username if assigned_user else "Unassigned"
+            'assigned_to': assigned_user_name
         }, status=status.HTTP_201_CREATED)
 
 

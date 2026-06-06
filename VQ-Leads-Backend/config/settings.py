@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'rest_framework',
-    'rest_framework.authtoken',
     'leads_crm',
 ]
 
@@ -58,13 +57,22 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+# Celery configurations
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+
 
 
 ROOT_URLCONF = 'config.urls'
@@ -92,8 +100,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'vq_leads_db',
+        'USER': 'postgres',
+        'PASSWORD': 'password',
+        'HOST': '127.0.0.1',
+        'PORT': '5432',
     }
 }
 

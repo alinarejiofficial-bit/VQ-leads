@@ -150,7 +150,7 @@ function getHeaders(): HeadersInit {
   };
   const token = localStorage.getItem('vq_token');
   if (token) {
-    headers['Authorization'] = `Token ${token}`;
+    headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
 }
