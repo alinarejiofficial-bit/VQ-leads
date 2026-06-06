@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store';
-import { 
-  LayoutDashboard, 
-  Users, 
-  FileCode, 
-  DollarSign, 
-  CheckSquare, 
+import {
+  LayoutDashboard,
+  Users,
+  FileCode,
+  DollarSign,
+  CheckSquare,
   LogOut,
   FolderOpen,
   BarChart3,
@@ -16,8 +16,7 @@ import {
   CalendarDays,
   Bell,
   ClipboardList,
-  Shield,
-  LucideIcon
+  Shield
 } from 'lucide-react';
 
 interface SubItem {
@@ -28,7 +27,7 @@ interface SubItem {
 interface NavItem {
   path: string;
   label: string;
-  icon: LucideIcon;
+  icon: React.ComponentType<any>;
   roles: string[];
   children?: SubItem[];
 }
