@@ -33,6 +33,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const [newLeadOwner, setNewLeadOwner] = useState<number | null>(null);
 
   const isAdmin = user.profile.role === 'ADMIN';
+  const isLeaderOrAdmin = isAdmin || user.profile.role === 'LEADER';
 
   // React Query fetch
   const { data: leads = [], refetch: refetchLeads } = useQuery<Lead[]>({
@@ -43,7 +44,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const { data: agents = [] } = useQuery<User[]>({
     queryKey: ['agents'],
     queryFn: api.getAgents,
-    enabled: isAdmin
+    enabled: isLeaderOrAdmin
   });
 
   // Mutations
@@ -185,7 +186,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             {sources.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
 
-          {isAdmin && (
+          {isLeaderOrAdmin && (
             <select 
               className="flex h-10 rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
               value={ownerFilter}
@@ -397,7 +398,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             </div>
           </div>
 
-          {isAdmin && (
+          {isLeaderOrAdmin && (
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Assign Agent</label>
               <select 

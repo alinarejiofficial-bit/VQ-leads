@@ -78,7 +78,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         <Card className="flex items-center justify-between p-6">
           <div className="flex flex-col text-left">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              {user.profile.role === 'ADMIN' ? 'Total Commissions' : 'My Commissions'}
+              {user.profile.role === 'ADMIN' ? 'Total Commissions' : user.profile.role === 'LEADER' ? 'Team Commissions' : 'My Commissions'}
             </span>
             <span className="text-3xl font-bold mt-2 text-foreground">{formatCurrency(stats?.earnedCommissions || 0)}</span>
           </div>
@@ -109,10 +109,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
       {/* Bottom Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {user.profile.role === 'ADMIN' && (
+        {(user.profile.role === 'ADMIN' || user.profile.role === 'LEADER') && (
           <Card className="p-6">
             <div className="mb-6 text-left">
-              <h3 className="text-base font-semibold text-foreground">Agent Performance Leaderboard</h3>
+              <h3 className="text-base font-semibold text-foreground">
+                {user.profile.role === 'ADMIN' ? 'Agent Performance Leaderboard' : 'Team Performance Leaderboard'}
+              </h3>
               <p className="text-xs text-muted-foreground">Revenue and conversion performance ranking</p>
             </div>
             <div className="space-y-3">

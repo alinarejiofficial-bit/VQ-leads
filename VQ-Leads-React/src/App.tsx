@@ -48,6 +48,19 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   return <>{children}</>;
 };
 
+interface LeaderOrAdminRouteProps {
+  children: React.ReactNode;
+}
+
+const LeaderOrAdminRoute: React.FC<LeaderOrAdminRouteProps> = ({ children }) => {
+  const user = useAuthStore(state => state.user);
+  if (!user || (user.profile.role !== 'ADMIN' && user.profile.role !== 'LEADER')) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
+
+
 // --- CORE APP ---
 function App() {
   const user = useAuthStore(state => state.user);
@@ -166,13 +179,13 @@ function App() {
           path="/reports" 
           element={
             <ProtectedRoute>
-              <AdminRoute>
+              <LeaderOrAdminRoute>
                 {user && (
                   <AdminLayout>
                     <Reports />
                   </AdminLayout>
                 )}
-              </AdminRoute>
+              </LeaderOrAdminRoute>
             </ProtectedRoute>
           } 
         />

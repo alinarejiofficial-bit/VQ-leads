@@ -25,13 +25,13 @@ export const Sidebar: React.FC = () => {
   };
 
   const navItems = [
-    { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'AGENT'] },
-    { path: '/leads', label: 'Leads Board', icon: FolderOpen, roles: ['ADMIN', 'AGENT'] },
+    { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'LEADER', 'AGENT'] },
+    { path: '/leads', label: 'Leads Board', icon: FolderOpen, roles: ['ADMIN', 'LEADER', 'AGENT'] },
     { path: '/teams', label: 'Sales Teams', icon: Users, roles: ['ADMIN'] },
     { path: '/forms', label: 'Lead Forms', icon: FileCode, roles: ['ADMIN'] },
-    { path: '/commissions', label: 'Commissions', icon: DollarSign, roles: ['ADMIN', 'AGENT'] },
-    { path: '/tasks', label: 'Tasks & Followups', icon: CheckSquare, roles: ['ADMIN', 'AGENT'] },
-    { path: '/reports', label: 'Reports', icon: BarChart3, roles: ['ADMIN'] },
+    { path: '/commissions', label: 'Commissions', icon: DollarSign, roles: ['ADMIN', 'LEADER', 'AGENT'] },
+    { path: '/tasks', label: 'Tasks & Followups', icon: CheckSquare, roles: ['ADMIN', 'LEADER', 'AGENT'] },
+    { path: '/reports', label: 'Reports', icon: BarChart3, roles: ['ADMIN', 'LEADER'] },
     { path: '/settings', label: 'Settings', icon: Settings, roles: ['ADMIN'] },
   ];
 
@@ -83,6 +83,8 @@ export const Sidebar: React.FC = () => {
             <span className={`text-[9px] w-fit font-bold uppercase rounded px-1.5 py-0.5 mt-0.5 border ${
               user.profile.role === 'ADMIN' 
                 ? 'bg-red-500/10 border-red-500/30 text-red-400' 
+                : user.profile.role === 'LEADER'
+                ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
                 : 'bg-green-500/10 border-green-500/30 text-green-400'
             }`}>
               {user.profile.role}

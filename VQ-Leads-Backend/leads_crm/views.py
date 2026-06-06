@@ -326,6 +326,10 @@ class TaskViewSet(viewsets.ModelViewSet):
             return Task.objects.none()
         if user.profile.role == 'ADMIN':
             return Task.objects.all().order_by('due_date')
+        if user.profile.role == 'LEADER':
+            led_teams = user.led_teams.all()
+            member_ids = User.objects.filter(sales_teams__in=led_teams).values_list('id', flat=True)
+            return Task.objects.filter(Q(assigned_to=user) | Q(created_by=user) | Q(assigned_to_id__in=member_ids)).order_by('due_date')
         return Task.objects.filter(Q(assigned_to=user) | Q(created_by=user)).order_by('due_date')
 
     def perform_create(self, serializer):
@@ -362,6 +366,10 @@ class FollowUpViewSet(viewsets.ModelViewSet):
             return FollowUp.objects.none()
         if user.profile.role == 'ADMIN':
             return FollowUp.objects.all().order_by('scheduled_time')
+        if user.profile.role == 'LEADER':
+            led_teams = user.led_teams.all()
+            member_ids = User.objects.filter(sales_teams__in=led_teams).values_list('id', flat=True)
+            return FollowUp.objects.filter(Q(lead__owner=user) | Q(lead__owner_id__in=member_ids)).order_by('scheduled_time')
         return FollowUp.objects.filter(lead__owner=user).order_by('scheduled_time')
 
     def perform_create(self, serializer):
@@ -396,9 +404,13 @@ class CommissionViewSet(viewsets.ModelViewSet):
             return Commission.objects.none()
         if user.profile.role == 'ADMIN':
             return Commission.objects.all().order_by('-calculated_at')
+        if user.profile.role == 'LEADER':
+            led_teams = user.led_teams.all()
+            member_ids = User.objects.filter(sales_teams__in=led_teams).values_list('id', flat=True)
+            return Commission.objects.filter(Q(agent=user) | Q(agent_id__in=member_ids)).order_by('-calculated_at')
         return Commission.objects.filter(agent=user).order_by('-calculated_at')
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminUserRole])
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrLeaderUserRole])
     def approve(self, request, pk=None):
         comm = self.get_object()
         comm.status = 'APPROVED'
@@ -426,7 +438,7 @@ class CommissionViewSet(viewsets.ModelViewSet):
         )
         return Response(CommissionSerializer(comm).data)
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminUserRole])
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrLeaderUserRole])
     def reject(self, request, pk=None):
         comm = self.get_object()
         comm.status = 'REJECTED'
@@ -444,38 +456,40 @@ class CommissionViewSet(viewsets.ModelViewSet):
 class DashboardStatsView(APIView):
     def get(self, request):
         user = request.user
-        isAdmin = user.profile.role == 'ADMIN'
+        role = user.profile.role
 
-        # Filter querysets based on role
-        leads_qs = Lead.objects.all() if isAdmin else Lead.objects.filter(owner=user)
-        tasks_qs = Task.objects.all() if isAdmin else Task.objects.filter(assigned_to=user)
-        commissions_qs = Commission.objects.all() if isAdmin else Commission.objects.filter(agent=user)
-        followups_qs = FollowUp.objects.all() if isAdmin else FollowUp.objects.filter(lead__owner=user)
+        if role == 'ADMIN':
+            leads_qs = Lead.objects.all()
+            tasks_qs = Task.objects.all()
+            commissions_qs = Commission.objects.all()
+            followups_qs = FollowUp.objects.all()
+        elif role == 'LEADER':
+            led_teams = user.led_teams.all()
+            member_ids = User.objects.filter(sales_teams__in=led_teams).values_list('id', flat=True)
+            leads_qs = Lead.objects.filter(Q(owner=user) | Q(owner_id__in=member_ids) | Q(owner__isnull=True))
+            tasks_qs = Task.objects.filter(Q(assigned_to=user) | Q(assigned_to_id__in=member_ids))
+            commissions_qs = Commission.objects.filter(Q(agent=user) | Q(agent_id__in=member_ids))
+            followups_qs = FollowUp.objects.filter(Q(lead__owner=user) | Q(lead__owner_id__in=member_ids))
+        else:
+            leads_qs = Lead.objects.filter(owner=user)
+            tasks_qs = Task.objects.filter(assigned_to=user)
+            commissions_qs = Commission.objects.filter(agent=user)
+            followups_qs = FollowUp.objects.filter(lead__owner=user)
 
         total_leads = leads_qs.count()
-        
-        # Follow-ups pending
         pending_followups = followups_qs.filter(completed=False).count()
-        
-        # Commissions (APPROVED or PAID)
         earned_commissions = commissions_qs.filter(status__in=['APPROVED', 'PAID']).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-        # Conversion rate
         won_leads = leads_qs.filter(status='WON').count()
         conversion_rate = (won_leads / total_leads * 100) if total_leads > 0 else 0.0
 
-        # Status breakdown
         status_breakdown = leads_qs.values('status').annotate(count=Count('id'))
         status_map = {item['status']: item['count'] for item in status_breakdown}
-        # fill in zeros for missing statuses
         for s, _ in Lead.STATUS_CHOICES:
             if s not in status_map:
                 status_map[s] = 0
 
-        # Source breakdown
         source_breakdown = leads_qs.values('source').annotate(count=Count('id')).order_by('-count')[:5]
-
-        # Pipeline value
         pipeline_value = leads_qs.exclude(status__in=['LOST', 'WON']).aggregate(total=Sum('value'))['total'] or Decimal('0.00')
 
         return Response({
@@ -492,15 +506,20 @@ class DashboardStatsView(APIView):
 class DashboardChartsView(APIView):
     def get(self, request):
         user = request.user
-        isAdmin = user.profile.role == 'ADMIN'
+        role = user.profile.role
 
-        # Leads over last 15 days
+        if role == 'ADMIN':
+            leads_qs = Lead.objects.all()
+        elif role == 'LEADER':
+            led_teams = user.led_teams.all()
+            member_ids = User.objects.filter(sales_teams__in=led_teams).values_list('id', flat=True)
+            leads_qs = Lead.objects.filter(Q(owner=user) | Q(owner_id__in=member_ids) | Q(owner__isnull=True))
+        else:
+            leads_qs = Lead.objects.filter(owner=user)
+
         end_date = timezone.now().date()
         start_date = end_date - datetime.timedelta(days=14)
 
-        leads_qs = Lead.objects.all() if isAdmin else Lead.objects.filter(owner=user)
-        
-        # Group by date
         daily_leads = leads_qs.filter(
             created_at__date__gte=start_date
         ).annotate(
@@ -509,7 +528,6 @@ class DashboardChartsView(APIView):
             count=Count('id')
         ).order_by('date')
 
-        # Fill in zero counts for missing dates
         daily_map = {item['date'].strftime('%Y-%m-%d'): item['count'] for item in daily_leads if item['date']}
         leads_timeline = []
         curr = start_date
@@ -521,10 +539,14 @@ class DashboardChartsView(APIView):
             })
             curr += datetime.timedelta(days=1)
 
-        # Agent leaderboard (Admin only)
         leaderboard = []
-        if isAdmin:
-            agents = User.objects.filter(profile__role='AGENT', is_active=True)
+        if role in ['ADMIN', 'LEADER']:
+            if role == 'ADMIN':
+                agents = User.objects.filter(profile__role='AGENT', is_active=True)
+            else:
+                led_teams = user.led_teams.all()
+                agents = User.objects.filter(sales_teams__in=led_teams, profile__role='AGENT', is_active=True).distinct()
+            
             for agent in agents:
                 agent_leads = Lead.objects.filter(owner=agent)
                 won_count = agent_leads.filter(status='WON').count()
@@ -537,11 +559,9 @@ class DashboardChartsView(APIView):
                 })
             leaderboard = sorted(leaderboard, key=lambda x: x['revenue'], reverse=True)[:5]
 
-        # Monthly Revenue (won leads value)
         monthly_rev = []
         six_months_ago = timezone.now().date() - datetime.timedelta(days=180)
         
-        # We can group by month
         monthly_leads = leads_qs.filter(
             status='WON',
             updated_at__date__gte=six_months_ago

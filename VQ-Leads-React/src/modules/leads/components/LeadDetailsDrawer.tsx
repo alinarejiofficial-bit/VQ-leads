@@ -56,6 +56,7 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
   const [followupNotes, setFollowupNotes] = useState('');
 
   const isAdmin = currentUser.profile.role === 'ADMIN';
+  const isLeaderOrAdmin = isAdmin || currentUser.profile.role === 'LEADER';
 
   const fetchLeadData = async () => {
     try {
@@ -309,9 +310,9 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                     </div>
                   </div>
 
-                  {isAdmin ? (
+                  {isLeaderOrAdmin ? (
                     <div className="flex flex-col gap-1 text-left">
-                      <label className="text-xs font-semibold text-foreground">Owner Assignment (Admin Only)</label>
+                      <label className="text-xs font-semibold text-foreground">Owner Assignment</label>
                       <div className="relative">
                         <UserCheck size={15} className="absolute left-3 top-3 text-muted-foreground" />
                         <select 
@@ -405,7 +406,7 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                           onChange={e => setTaskAssignedTo(Number(e.target.value))}
                         >
                           <option value={currentUser.id}>Assign to Me</option>
-                          {isAdmin && agents.map(a => (
+                          {isLeaderOrAdmin && agents.map(a => (
                             <option key={a.id} value={a.id}>{a.full_name}</option>
                           ))}
                         </select>

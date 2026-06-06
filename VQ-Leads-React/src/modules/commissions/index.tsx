@@ -13,6 +13,7 @@ interface CommissionsProps {
 export const Commissions: React.FC<CommissionsProps> = ({ user }) => {
   const queryClient = useQueryClient();
   const isAdmin = user.profile.role === 'ADMIN';
+  const isLeaderOrAdmin = isAdmin || user.profile.role === 'LEADER';
 
   // React Queries
   const { data: commissions = [] } = useQuery<Commission[]>({
@@ -81,7 +82,7 @@ export const Commissions: React.FC<CommissionsProps> = ({ user }) => {
 
         <Card className="flex items-center justify-between p-6">
           <div className="flex flex-col text-left">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Awaiting Admin Approval</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Awaiting Approval</span>
             <span className="text-3xl font-bold mt-2 text-foreground">${totalPending.toFixed(2)}</span>
           </div>
           <div className="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
@@ -111,7 +112,7 @@ export const Commissions: React.FC<CommissionsProps> = ({ user }) => {
               <TableHead>Commission Rate</TableHead>
               <TableHead>Payout Amount</TableHead>
               <TableHead>Transaction Status</TableHead>
-              <TableHead>Admin Actions</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -140,7 +141,7 @@ export const Commissions: React.FC<CommissionsProps> = ({ user }) => {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {isAdmin && c.status === 'PENDING' && (
+                    {isLeaderOrAdmin && c.status === 'PENDING' && (
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm" className="h-8 text-xs bg-green-500/10 hover:bg-green-500/20 border-green-500/20 text-green-400" onClick={() => handleApprove(c.id)}>
                           Approve
@@ -155,6 +156,11 @@ export const Commissions: React.FC<CommissionsProps> = ({ user }) => {
                         Mark Paid
                       </Button>
                     )}
+                    {user.profile.role === 'LEADER' && c.status === 'APPROVED' && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CheckCircle size={12} className="text-primary-foreground" /> Approved
+                      </span>
+                    )}
                     {c.status === 'PAID' && (
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <CheckCircle size={12} className="text-green-400" /> Disbursed
@@ -163,7 +169,7 @@ export const Commissions: React.FC<CommissionsProps> = ({ user }) => {
                     {c.status === 'REJECTED' && (
                       <span className="text-xs text-red-400">Rejected</span>
                     )}
-                    {!isAdmin && c.status === 'PENDING' && (
+                    {!isLeaderOrAdmin && c.status === 'PENDING' && (
                       <span className="text-xs text-muted-foreground">Pending Review</span>
                     )}
                   </TableCell>

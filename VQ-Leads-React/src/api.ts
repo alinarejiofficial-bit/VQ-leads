@@ -2,7 +2,7 @@ export const API_BASE = 'http://localhost:8000/api';
 
 // Interfaces
 export interface UserProfile {
-  role: 'ADMIN' | 'AGENT';
+  role: 'ADMIN' | 'LEADER' | 'AGENT';
   commission_rate: string;
 }
 
