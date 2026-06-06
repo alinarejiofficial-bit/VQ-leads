@@ -15,8 +15,7 @@ import {
   Activity,
   CalendarDays,
   Bell,
-  ClipboardList,
-  Shield
+  ClipboardList
 } from 'lucide-react';
 
 interface SubItem {
@@ -223,36 +222,36 @@ export const Sidebar: React.FC = () => {
             const isOpen = openMenus[item.label] || isActive;
 
             return (
-              <div key={item.label}>
+              <div key={item.label} className="animate-fade-in" style={{ animationDelay: '50ms' }}>
                 {/* Parent Item */}
                 {hasChildren ? (
                   <button
                     onClick={() => toggleMenu(item.label)}
-                    className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${
+                    className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 hover:translate-x-0.5 cursor-pointer ${
                       isActive 
-                        ? 'bg-primary/8 text-primary font-semibold' 
-                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
+                        ? 'bg-primary/10 text-primary font-semibold shadow-sm shadow-primary/5' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <IconComponent size={17} strokeWidth={isActive ? 2.2 : 1.8} className={isActive ? 'text-primary' : 'text-muted-foreground'} />
+                      <IconComponent size={17} strokeWidth={isActive ? 2.2 : 1.8} className={`transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
                       <span>{item.label}</span>
                     </div>
                     <ChevronRight 
                       size={14} 
-                      className={`text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} 
+                      className={`text-muted-foreground transition-transform duration-300 ${isOpen ? 'rotate-90 text-primary' : ''}`} 
                     />
                   </button>
                 ) : (
                   <Link 
                     to={item.path}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 hover:translate-x-0.5 ${
                       isActive 
-                        ? 'bg-primary/8 text-primary font-semibold' 
-                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
+                        ? 'bg-primary/10 text-primary font-semibold shadow-sm shadow-primary/5' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
                     }`}
                   >
-                    <IconComponent size={17} strokeWidth={isActive ? 2.2 : 1.8} className={isActive ? 'text-primary' : 'text-muted-foreground'} />
+                    <IconComponent size={17} strokeWidth={isActive ? 2.2 : 1.8} className={`transition-transform duration-200 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
                     <span>{item.label}</span>
                   </Link>
                 )}
@@ -260,23 +259,23 @@ export const Sidebar: React.FC = () => {
                 {/* Sub Items */}
                 {hasChildren && (
                   <div 
-                    className="overflow-hidden transition-all duration-200 ease-in-out"
+                    className="overflow-hidden transition-all duration-300 ease-in-out"
                     style={{ 
                       maxHeight: isOpen ? `${(item.children!.length) * 36}px` : '0px',
                       opacity: isOpen ? 1 : 0 
                     }}
                   >
                     <div className="ml-5 pl-4 border-l border-border/60 mt-0.5 mb-1 flex flex-col gap-0.5">
-                      {item.children!.map(child => {
+                      {item.children!.map((child) => {
                         const childActive = isSubItemActive(child.path);
                         return (
                           <Link
                             key={child.path + child.label}
                             to={child.path}
-                            className={`block px-3 py-1.5 rounded-md text-[12px] font-medium transition-all ${
+                            className={`block px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-200 hover:translate-x-0.5 ${
                               childActive
-                                ? 'text-primary bg-primary/6 font-semibold'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/30'
+                                ? 'text-primary bg-primary/8 font-semibold shadow-sm shadow-primary/5'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
                             }`}
                           >
                             {child.label}

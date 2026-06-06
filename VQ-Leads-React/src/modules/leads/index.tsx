@@ -193,7 +193,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   ];
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-8 space-y-6 animate-fade-in">
       {/* Header Filters & View Switching */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -303,10 +303,11 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                   </TableCell>
                 </TableRow>
               ) : (
-                  filteredLeads.map(l => (
+                  filteredLeads.map((l, idx) => (
                   <TableRow
                     key={l.id}
-                    className="cursor-pointer hover:bg-muted/30 transition-colors"
+                    className="cursor-pointer hover:bg-muted/30 transition-colors animate-fade-in-up"
+                    style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'both' }}
                     onClick={() => setSelectedLeadId(l.id)}
                   >
                     <TableCell className="font-semibold text-foreground">
@@ -339,7 +340,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
           {kanbanColumns.map(col => {
             const colLeads = filteredLeads.filter(l => l.status === col.id);
             return (
-              <div key={col.id} className="flex-1 min-w-[280px] max-w-[340px] bg-card/40 border border-border/80 rounded-xl p-4 flex flex-col max-h-[calc(100vh-190px)] shrink-0">
+              <div key={col.id} className="flex-1 min-w-[280px] max-w-[340px] bg-card/40 border border-border/80 rounded-xl p-4 flex flex-col max-h-[calc(100vh-190px)] shrink-0 animate-fade-in">
                 <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-2">
                   <div className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full ${col.color}`} />
@@ -351,10 +352,11 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                 </div>
 
                 <div className="flex flex-col gap-3 overflow-y-auto pr-1">
-                  {colLeads.map(l => (
+                  {colLeads.map((l, idx) => (
                     <div 
                       key={l.id} 
-                      className="bg-card border border-border/80 rounded-lg p-4 cursor-pointer hover:border-border/100 hover:shadow-lg transition-all text-left"
+                      className="bg-card border border-border/80 rounded-lg p-4 cursor-pointer hover:border-border/100 hover:shadow-lg transition-all text-left animate-fade-in-up"
+                      style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'both' }}
                       onClick={() => setSelectedLeadId(l.id)}
                     >
                       <h5 className="text-sm font-semibold text-foreground leading-snug">{l.name}</h5>

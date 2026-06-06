@@ -80,16 +80,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const activeTimeframes: ('1D' | '1W' | '1M' | '6M' | '1Y')[] = ['1D', '1W', '1M', '6M', '1Y'];
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto text-left">
+    <div className="p-8 space-y-6 max-w-7xl mx-auto text-left animate-fade-in">
       {/* Title */}
-      <div>
+      <div className="animate-fade-in-up">
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
       </div>
 
       {/* Row 1 & 2: Statistics Grid (10 cards: 5x2 grid) */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {/* Total Leads */}
-        <Card className="p-4 flex flex-col justify-between border border-border/60 hover:shadow-sm transition-all text-left">
+        <Card className="p-4 flex flex-col justify-between border border-border/60 hover-card-lift transition-card text-left animate-fade-in-up delay-100">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Leads</span>
             <Users size={14} className="text-red-500" />
@@ -100,7 +100,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </Card>
 
         {/* Available Leads */}
-        <Card className="p-4 flex flex-col justify-between border border-border/60 hover:shadow-sm transition-all text-left">
+        <Card className="p-4 flex flex-col justify-between border border-border/60 hover-card-lift transition-card text-left animate-fade-in-up delay-150">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Available Leads</span>
             <UserCheck size={14} className="text-blue-500" />
@@ -111,7 +111,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </Card>
 
         {/* Assigned Leads */}
-        <Card className="p-4 flex flex-col justify-between border border-border/60 hover:shadow-sm transition-all text-left">
+        <Card className="p-4 flex flex-col justify-between border border-border/60 hover-card-lift transition-card text-left animate-fade-in-up delay-200">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Assigned Leads</span>
             <UserPlus size={14} className="text-indigo-500" />
@@ -122,7 +122,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </Card>
 
         {/* Claimed Leads */}
-        <Card className="p-4 flex flex-col justify-between border border-border/60 hover:shadow-sm transition-all text-left">
+        <Card className="p-4 flex flex-col justify-between border border-border/60 hover-card-lift transition-card text-left animate-fade-in-up delay-250">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Claimed Leads</span>
             <Sparkles size={14} className="text-amber-500" />
@@ -133,7 +133,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </Card>
 
         {/* Converted Leads */}
-        <Card className="p-4 flex flex-col justify-between border border-border/60 hover:shadow-sm transition-all text-left">
+        <Card className="p-4 flex flex-col justify-between border border-border/60 hover-card-lift transition-card text-left animate-fade-in-up delay-300">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Converted Leads</span>
             <CheckCircle2 size={14} className="text-green-500" />
@@ -144,7 +144,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </Card>
 
         {/* Lost Leads */}
-        <Card className="p-4 flex flex-col justify-between border border-border/60 hover:shadow-sm transition-all text-left">
+        <Card className="p-4 flex flex-col justify-between border border-border/60 hover-card-lift transition-card text-left animate-fade-in-up delay-150">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Lost Leads</span>
             <XCircle size={14} className="text-red-500" />
@@ -155,7 +155,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </Card>
 
         {/* Today's Leads */}
-        <Card className="p-4 flex flex-col justify-between border border-border/60 hover:shadow-sm transition-all text-left">
+        <Card className="p-4 flex flex-col justify-between border border-border/60 hover-card-lift transition-card text-left animate-fade-in-up delay-200">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Today's Leads</span>
             <Clock size={14} className="text-cyan-500" />
@@ -166,7 +166,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </Card>
 
         {/* Revenue Generated */}
-        <Card className="p-4 flex flex-col justify-between border border-border/60 hover:shadow-sm transition-all text-left">
+        <Card className="p-4 flex flex-col justify-between border border-border/60 hover-card-lift transition-card text-left animate-fade-in-up delay-250">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Revenue</span>
             <IndianRupee size={14} className="text-emerald-500" />
@@ -177,7 +177,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </Card>
 
         {/* Total Commission */}
-        <Card className="p-4 flex flex-col justify-between border border-border/60 hover:shadow-sm transition-all text-left">
+        <Card className="p-4 flex flex-col justify-between border border-border/60 hover-card-lift transition-card text-left animate-fade-in-up delay-300">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Commission</span>
             <DollarSign size={14} className="text-purple-500" />
@@ -188,7 +188,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </Card>
 
         {/* Follow-ups Due */}
-        <Card className="p-4 flex flex-col justify-between border border-border/60 hover:shadow-sm transition-all text-left">
+        <Card className="p-4 flex flex-col justify-between border border-border/60 hover-card-lift transition-card text-left animate-fade-in-up delay-350">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Follow-ups Due</span>
             <Calendar size={14} className="text-orange-500" />
