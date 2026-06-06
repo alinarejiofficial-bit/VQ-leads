@@ -477,7 +477,13 @@ class DashboardStatsView(APIView):
             followups_qs = FollowUp.objects.filter(lead__owner=user)
 
         total_leads = leads_qs.count()
-        pending_followups = followups_qs.filter(completed=False).count()
+        available_leads = leads_qs.filter(owner__isnull=True).count()
+        assigned_leads = leads_qs.filter(owner__isnull=False).count()
+        claimed_leads = leads_qs.filter(owner__isnull=False).exclude(status='NEW').count()
+        won_leads = leads_qs.filter(status='WON').count()
+        lost_leads = leads_qs.filter(status='LOST').count()
+        today_leads = leads_qs.filter(created_at__date=timezone.now().date()).count()
+        followups_due = followups_qs.filter(completed=False).count()
         earned_commissions = commissions_qs.filter(status__in=['APPROVED', 'PAID']).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
         won_leads = leads_qs.filter(status='WON').count()
@@ -494,7 +500,13 @@ class DashboardStatsView(APIView):
 
         return Response({
             'totalLeads': total_leads,
-            'pendingFollowups': pending_followups,
+            'availableLeads': available_leads,
+            'assignedLeads': assigned_leads,
+            'claimedLeads': claimed_leads,
+            'convertedLeads': won_leads,
+            'lostLeads': lost_leads,
+            'todayLeads': today_leads,
+            'followupsDue': followups_due,
             'earnedCommissions': float(earned_commissions),
             'conversionRate': round(conversion_rate, 2),
             'pipelineValue': float(pipeline_value),

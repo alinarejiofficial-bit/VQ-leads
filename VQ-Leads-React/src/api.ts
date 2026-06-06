@@ -112,7 +112,13 @@ export interface Commission {
 
 export interface DashboardStats {
   totalLeads: number;
-  pendingFollowups: number;
+  availableLeads: number;
+  assignedLeads: number;
+  claimedLeads: number;
+  convertedLeads: number;
+  lostLeads: number;
+  todayLeads: number;
+  followupsDue: number;
   earnedCommissions: number;
   conversionRate: number;
   pipelineValue: number;
