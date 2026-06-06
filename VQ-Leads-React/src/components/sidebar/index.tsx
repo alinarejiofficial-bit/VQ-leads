@@ -91,24 +91,6 @@ export const Sidebar: React.FC = () => {
         </ul>
       </div>
 
-      <div className="flex flex-col gap-4 mt-6">
-        {/* Cloud Storage Widget */}
-        <div className="p-4 rounded-xl bg-secondary/50 border border-border flex flex-col gap-3">
-          <div className="flex items-center justify-between text-xs font-semibold text-foreground">
-            <span>Cloud Storage</span>
-            <span>90%</span>
-          </div>
-          <div className="w-full bg-secondary h-1.5 rounded-full overflow-hidden">
-            <div className="bg-orange-500 h-full rounded-full" style={{ width: '90%' }} />
-          </div>
-          <div className="text-[10px] text-muted-foreground font-medium text-left">
-            1.8 GB of 2 GB used
-          </div>
-          <button className="flex items-center justify-between w-full bg-primary hover:bg-primary/95 text-primary-foreground text-xs font-bold py-2 px-3 rounded-lg transition-all mt-1 cursor-pointer">
-            <span>Upgrade Storage</span>
-            <span className="text-xs font-bold">+</span>
-          </button>
-        </div>
 
         {/* User Card */}
         <div className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/40">

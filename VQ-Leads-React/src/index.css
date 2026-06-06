@@ -46,13 +46,33 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: 'Inter', system-ui, sans-serif;
-    font-weight: 400;
+    font-size: 15px;
+    font-weight: 500;
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1 {
     font-family: 'Inter', system-ui, sans-serif;
-    font-weight: 600;
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+  }
+  h2 {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
     letter-spacing: -0.02em;
+  }
+  h3 {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+  h4, h5, h6 {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 }
 
