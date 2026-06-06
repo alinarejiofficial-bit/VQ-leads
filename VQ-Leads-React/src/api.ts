@@ -45,7 +45,7 @@ export interface Lead {
   email: string;
   phone: string;
   company: string;
-  status: 'NEW' | 'CONTACTED' | 'IN_PROGRESS' | 'QUALIFIED' | 'LOST' | 'WON';
+  status: 'NEW' | 'AVAILABLE' | 'CLAIMED' | 'CONTACTED' | 'QUALIFIED' | 'FOLLOW_UP' | 'PROPOSAL_SENT' | 'NEGOTIATION' | 'CONVERTED' | 'LOST' | 'DUPLICATE' | 'INVALID';
   source: string;
   value: string;
   owner: number | null;

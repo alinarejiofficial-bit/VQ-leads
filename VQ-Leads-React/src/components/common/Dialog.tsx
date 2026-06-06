@@ -23,7 +23,7 @@ export const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, title, children
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" onClick={onClose}>
       <div 
-        className="w-full max-w-lg rounded-xl border border-border bg-[#0d0e15] p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 text-left"
+        className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 text-left"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border pb-4 mb-4">

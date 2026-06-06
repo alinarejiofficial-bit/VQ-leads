@@ -269,10 +269,10 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity" onClick={onClose} />
       
       {/* Side-Drawer panel (Wider to support tabs and statistics elegantly) */}
-      <div className="fixed right-0 top-0 bottom-0 w-[680px] max-w-full bg-[#0d0e15] border-l border-border shadow-2xl z-50 flex flex-col animate-slide-in text-left">
+      <div className="fixed right-0 top-0 bottom-0 w-[680px] max-w-full bg-card border-l border-border shadow-2xl z-50 flex flex-col animate-slide-in text-left">
         
         {/* Drawer Header */}
-        <div className="p-6 border-b border-border flex justify-between items-center bg-card/20">
+        <div className="p-6 border-b border-border flex justify-between items-center bg-secondary/10">
           <div className="flex flex-col gap-1">
             <h3 className="text-lg font-bold text-foreground">{lead?.name || 'Loading Lead...'}</h3>
             <div className="flex items-center gap-2 mt-1">

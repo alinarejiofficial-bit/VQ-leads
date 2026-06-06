@@ -267,9 +267,11 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             </button>
           </div>
 
-          <Button variant="outline" onClick={handleExportCSV}>
-            <Download size={16} className="mr-1.5" /> Export CSV
-          </Button>
+          {isAdmin && (
+            <Button variant="outline" onClick={handleExportCSV}>
+              <Download size={16} className="mr-1.5" /> Export CSV
+            </Button>
+          )}
 
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus size={16} className="mr-1.5" /> New Lead
