@@ -7,7 +7,7 @@ import { Input } from '../../components/forms/Input';
 import { Dialog } from '../../components/common/Dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/datatable/Table';
 import { LeadDetailsDrawer } from './components/LeadDetailsDrawer';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Download } from 'lucide-react';
 
 interface LeadsProps {
   user: User;
@@ -105,6 +105,36 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
     return matchesSearch && matchesStatus && matchesSource && matchesOwner;
   });
 
+  const handleExportCSV = () => {
+    if (filteredLeads.length === 0) {
+      alert("No leads to export.");
+      return;
+    }
+    const headers = ["ID", "Name", "Company", "Email", "Phone", "Status", "Source", "Value ($)", "Owner", "Created Date"];
+    const rows = filteredLeads.map(l => [
+      l.id,
+      `"${l.name.replace(/"/g, '""')}"`,
+      `"${(l.company || '').replace(/"/g, '""')}"`,
+      `"${l.email || ''}"`,
+      `"${l.phone || ''}"`,
+      l.status,
+      `"${l.source.replace(/"/g, '""')}"`,
+      l.value,
+      `"${(l.owner_name || 'Unassigned').replace(/"/g, '""')}"`,
+      new Date(l.created_at).toLocaleDateString()
+    ]);
+    const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `vq_leads_export_${new Date().toISOString().slice(0,10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const sources = Array.from(new Set(leads.map(l => l.source)));
 
   const kanbanColumns = [
@@ -185,11 +215,16 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             </button>
           </div>
 
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download size={16} className="mr-1.5" /> Export CSV
+          </Button>
+
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus size={16} className="mr-1.5" /> New Lead
           </Button>
         </div>
       </div>
+
 
       {/* Grid or List render */}
       {viewMode === 'list' ? (

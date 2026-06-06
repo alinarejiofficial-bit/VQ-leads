@@ -20,6 +20,8 @@ import { Forms } from './modules/forms';
 import { PublicForm } from './modules/forms/components/PublicForm';
 import { Commissions } from './modules/commissions';
 import { TasksPage } from './modules/tasks';
+import { Reports } from './modules/reports';
+import { Settings } from './modules/settings';
 
 // --- AUTH GATES ---
 interface ProtectedRouteProps {
@@ -156,6 +158,36 @@ function App() {
                   <TasksPage />
                 </AdminLayout>
               )}
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/reports" 
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                {user && (
+                  <AdminLayout>
+                    <Reports />
+                  </AdminLayout>
+                )}
+              </AdminRoute>
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/settings" 
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                {user && (
+                  <AdminLayout>
+                    <Settings />
+                  </AdminLayout>
+                )}
+              </AdminRoute>
             </ProtectedRoute>
           } 
         />

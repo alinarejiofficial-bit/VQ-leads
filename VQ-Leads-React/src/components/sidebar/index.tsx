@@ -8,7 +8,9 @@ import {
   DollarSign, 
   CheckSquare, 
   LogOut,
-  FolderOpen
+  FolderOpen,
+  BarChart3,
+  Settings
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -29,7 +31,10 @@ export const Sidebar: React.FC = () => {
     { path: '/forms', label: 'Lead Forms', icon: FileCode, roles: ['ADMIN'] },
     { path: '/commissions', label: 'Commissions', icon: DollarSign, roles: ['ADMIN', 'AGENT'] },
     { path: '/tasks', label: 'Tasks & Followups', icon: CheckSquare, roles: ['ADMIN', 'AGENT'] },
+    { path: '/reports', label: 'Reports', icon: BarChart3, roles: ['ADMIN'] },
+    { path: '/settings', label: 'Settings', icon: Settings, roles: ['ADMIN'] },
   ];
+
 
   const filteredItems = navItems.filter(item => item.roles.includes(user.profile.role));
 

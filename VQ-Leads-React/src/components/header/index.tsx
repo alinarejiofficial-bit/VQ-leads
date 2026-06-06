@@ -9,6 +9,8 @@ export const Header: React.FC = () => {
     if (path.startsWith('/forms')) return 'Public Forms Manager';
     if (path.startsWith('/commissions')) return 'Commissions Hub';
     if (path.startsWith('/tasks')) return 'My Tasks & Reminders';
+    if (path.startsWith('/reports')) return 'Analytical Reports';
+    if (path.startsWith('/settings')) return 'CRM Global Settings';
     return 'CRM Platform';
   };
 
