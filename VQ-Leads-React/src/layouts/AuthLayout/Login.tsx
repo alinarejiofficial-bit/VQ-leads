@@ -5,7 +5,7 @@ import { api } from '../../api';
 import { useAuthStore } from '../../store';
 import { Button } from '../../components/forms/Button';
 import { Input } from '../../components/forms/Input';
-import { Shield, Users, ArrowRight, TrendingUp, Sparkles } from 'lucide-react';
+import { Shield, Users, ArrowRight } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [roleTab, setRoleTab] = useState<'agent' | 'admin'>('agent');
@@ -66,56 +66,46 @@ export const Login: React.FC = () => {
       {/* Main Split-Pane Login Container */}
       <div className="w-full bg-card/90 border border-border/50 rounded-3xl min-h-[580px] overflow-hidden shadow-2xl backdrop-blur-xl animate-fade-in-up flex relative">
         
-        {/* ==================== SLIDING ARTWORK OVERLAY PANEL ==================== */}
+        {/* ==================== SLIDING OVERLAY PANEL (Vibrant Model) ==================== */}
         <div 
-          className="hidden md:flex absolute top-0 bottom-0 w-[48%] bg-slate-950/80 border-r border-border/30 transition-all duration-500 ease-[cubic-bezier(0.76,0,0.24,1)] z-20 flex-col justify-between p-8 overflow-hidden select-none"
+          className="hidden md:flex absolute top-0 bottom-0 w-[48%] bg-gradient-to-tr from-primary to-indigo-600 transition-all duration-500 ease-[cubic-bezier(0.76,0,0.24,1)] z-20 flex-col justify-center items-center text-center p-12 overflow-hidden select-none text-white"
           style={{
             left: roleTab === 'agent' ? '0%' : '52%'
           }}
         >
-          {/* Background Illustration Artwork */}
-          <div className="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-lighten pointer-events-none" style={{ backgroundImage: "url('/crm_login_art.png')" }} />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent pointer-events-none" />
-
-          {/* Top Info */}
-          <div className="relative z-10 flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center text-white font-black text-base">
+          {/* Subtle overlay elements */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.15)_0%,rgba(0,0,0,0)_60%)] pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col items-center gap-6 max-w-sm">
+            <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center text-white font-black text-xl backdrop-blur-md border border-white/20">
               ❖
             </div>
-            <span className="font-bold text-white text-sm tracking-wide uppercase">Brisk CRM</span>
-          </div>
 
-          {/* Floating UI Badges for WOW factor */}
-          <div className="relative z-10 my-auto flex flex-col gap-4">
-            <div className="bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-xl self-start max-w-[220px] animate-float-slow hover:bg-white/[0.06] transition-all duration-300">
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                  <TrendingUp size={15} />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-[9px] text-white/50 uppercase font-bold tracking-wider">Close Rate</span>
-                  <span className="text-xs font-extrabold text-white">+8.5% This Month</span>
-                </div>
+            {roleTab === 'agent' ? (
+              <div key="agent-welcome" className="animate-fade-in flex flex-col items-center gap-3">
+                <h2 className="text-3xl font-extrabold tracking-tight">Hello Admin!</h2>
+                <p className="text-sm text-white/80 leading-relaxed">Access configurations, team boards, form builders, and audit logs.</p>
+                <button
+                  type="button"
+                  onClick={() => setRoleTab('admin')}
+                  className="mt-6 px-8 py-3 rounded-full border-2 border-white/60 hover:border-white bg-transparent hover:bg-white hover:text-primary font-bold text-xs tracking-wider uppercase transition-all duration-300 active:scale-95 cursor-pointer shadow-md"
+                >
+                  Admin Console
+                </button>
               </div>
-            </div>
-
-            <div className="bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-xl self-end max-w-[220px] animate-float-slower hover:bg-white/[0.06] transition-all duration-300">
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400">
-                  <Sparkles size={15} />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-[9px] text-white/50 uppercase font-bold tracking-wider">System State</span>
-                  <span className="text-xs font-extrabold text-white">Claims Auto-Routed</span>
-                </div>
+            ) : (
+              <div key="admin-welcome" className="animate-fade-in flex flex-col items-center gap-3">
+                <h2 className="text-3xl font-extrabold tracking-tight">Hello Agent!</h2>
+                <p className="text-sm text-white/80 leading-relaxed">Sign in to view your leads pipeline, log calls, and claim new leads.</p>
+                <button
+                  type="button"
+                  onClick={() => setRoleTab('agent')}
+                  className="mt-6 px-8 py-3 rounded-full border-2 border-white/60 hover:border-white bg-transparent hover:bg-white hover:text-primary font-bold text-xs tracking-wider uppercase transition-all duration-300 active:scale-95 cursor-pointer shadow-md"
+                >
+                  Agent Portal
+                </button>
               </div>
-            </div>
-          </div>
-
-          {/* Bottom Branding / Copy */}
-          <div className="relative z-10 text-left">
-            <h3 className="text-base font-bold text-white leading-snug">The Ultimate CRM Experience</h3>
-            <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">Fast client response times, integrated workflows, automated team updates, and beautiful analytics.</p>
+            )}
           </div>
         </div>
 
@@ -126,32 +116,10 @@ export const Login: React.FC = () => {
             roleTab === 'admin' ? 'opacity-100 z-10 animate-fade-in' : 'opacity-0 md:opacity-20 z-0 pointer-events-none'
           }`}
         >
-          <div className="flex flex-col items-center md:items-start text-center md:text-left mb-4">
+          <div className="flex flex-col items-center md:items-start text-center md:text-left mb-6">
             <Shield className="text-primary mb-2" size={32} />
-            <h2 className="text-2xl font-extrabold text-foreground tracking-tight">Admin Console</h2>
+            <h2 className="text-2xl font-extrabold text-foreground tracking-tight">Admin Sign In</h2>
             <p className="text-xs text-muted-foreground mt-1 font-medium">Log in with system administrator credentials</p>
-          </div>
-
-          {/* Sliding Role Selection Toggle Tab */}
-          <div className="relative flex p-1.5 bg-secondary/80 rounded-2xl mb-5 border border-border/40 select-none w-full">
-            {/* Sliding Pill Background Indicator */}
-            <div className="absolute top-1.5 bottom-1.5 rounded-xl bg-card shadow-md transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] left-[50%] w-[48%]" />
-            <button
-              type="button"
-              className="flex-1 flex items-center justify-center gap-2 py-2 px-3 text-xs font-bold rounded-xl z-10 text-muted-foreground hover:text-foreground cursor-pointer"
-              onClick={() => setRoleTab('agent')}
-            >
-              <Users size={14} />
-              <span>Agent Portal</span>
-            </button>
-            <button
-              type="button"
-              className="flex-1 flex items-center justify-center gap-2 py-2 px-3 text-xs font-bold rounded-xl z-10 text-primary cursor-pointer"
-              onClick={() => setRoleTab('admin')}
-            >
-              <Shield size={14} />
-              <span>Admin Console</span>
-            </button>
           </div>
 
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
@@ -185,7 +153,7 @@ export const Login: React.FC = () => {
 
             <Button 
               type="submit" 
-              className="w-full mt-1 h-11 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:shadow-primary/35 active:scale-[0.98] transition-all" 
+              className="w-full mt-2 h-11 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:shadow-primary/35 active:scale-[0.98] transition-all" 
               disabled={loginMutation.isPending}
             >
               <span>{loginMutation.isPending ? 'Authenticating...' : 'Sign In Admin'}</span>
@@ -193,8 +161,8 @@ export const Login: React.FC = () => {
             </Button>
           </form>
 
-          {/* Quick Pre-fills & Toggle to switch state */}
-          <div className="mt-5 border-t border-border/40 pt-4 flex flex-col gap-3">
+          {/* Quick Pre-fills & Mobile-only Switch */}
+          <div className="mt-6 border-t border-border/40 pt-4 flex flex-col gap-3">
             <button 
               type="button"
               className="flex justify-between items-center text-left text-xs bg-secondary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary border border-border/40 hover:border-primary/20 p-2.5 rounded-xl transition-all duration-300 cursor-pointer"
@@ -202,6 +170,13 @@ export const Login: React.FC = () => {
             >
               <span className="font-bold text-foreground">Sarah Conner (Admin)</span>
               <span className="opacity-70 font-mono text-[10px] bg-secondary/80 px-2 py-0.5 rounded-md border border-border/60">admin</span>
+            </button>
+            <button 
+              type="button"
+              className="md:hidden text-xs text-primary font-bold hover:underline text-center mt-2 cursor-pointer"
+              onClick={() => setRoleTab('agent')}
+            >
+              ← Back to Agent Portal Login
             </button>
           </div>
         </div>
@@ -213,32 +188,10 @@ export const Login: React.FC = () => {
             roleTab === 'agent' ? 'opacity-100 z-10 animate-fade-in' : 'opacity-0 md:opacity-20 z-0 pointer-events-none'
           }`}
         >
-          <div className="flex flex-col items-center md:items-start text-center md:text-left mb-4">
+          <div className="flex flex-col items-center md:items-start text-center md:text-left mb-6">
             <Users className="text-primary mb-2" size={32} />
-            <h2 className="text-2xl font-extrabold text-foreground tracking-tight">Agent Portal</h2>
+            <h2 className="text-2xl font-extrabold text-foreground tracking-tight">Agent Sign In</h2>
             <p className="text-xs text-muted-foreground mt-1 font-medium">Log in with sales representative credentials</p>
-          </div>
-
-          {/* Sliding Role Selection Toggle Tab */}
-          <div className="relative flex p-1.5 bg-secondary/80 rounded-2xl mb-5 border border-border/40 select-none w-full">
-            {/* Sliding Pill Background Indicator */}
-            <div className="absolute top-1.5 bottom-1.5 rounded-xl bg-card shadow-md transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] left-1.5 w-[48%]" />
-            <button
-              type="button"
-              className="flex-1 flex items-center justify-center gap-2 py-2 px-3 text-xs font-bold rounded-xl z-10 text-primary cursor-pointer"
-              onClick={() => setRoleTab('agent')}
-            >
-              <Users size={14} />
-              <span>Agent Portal</span>
-            </button>
-            <button
-              type="button"
-              className="flex-1 flex items-center justify-center gap-2 py-2 px-3 text-xs font-bold rounded-xl z-10 text-muted-foreground hover:text-foreground cursor-pointer"
-              onClick={() => setRoleTab('admin')}
-            >
-              <Shield size={14} />
-              <span>Admin Console</span>
-            </button>
           </div>
 
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
@@ -272,7 +225,7 @@ export const Login: React.FC = () => {
 
             <Button 
               type="submit" 
-              className="w-full mt-1 h-11 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:shadow-primary/35 active:scale-[0.98] transition-all" 
+              className="w-full mt-2 h-11 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:shadow-primary/35 active:scale-[0.98] transition-all" 
               disabled={loginMutation.isPending}
             >
               <span>{loginMutation.isPending ? 'Authenticating...' : 'Sign In Agent'}</span>
@@ -280,8 +233,8 @@ export const Login: React.FC = () => {
             </Button>
           </form>
 
-          {/* Quick Demo Pre-fills & Toggle to switch state */}
-          <div className="mt-5 border-t border-border/40 pt-4 flex flex-col gap-2">
+          {/* Quick Demo Pre-fills & Mobile-only Switch */}
+          <div className="mt-6 border-t border-border/40 pt-4 flex flex-col gap-2">
             <div className="flex flex-col gap-2">
               <button 
                 type="button"
@@ -300,9 +253,15 @@ export const Login: React.FC = () => {
                 <span className="opacity-70 font-mono text-[9px] bg-secondary/80 px-2 py-0.5 rounded-md border border-border/60">agent2</span>
               </button>
             </div>
+            <button 
+              type="button"
+              className="md:hidden text-xs text-primary font-bold hover:underline text-center mt-3 cursor-pointer"
+              onClick={() => setRoleTab('admin')}
+            >
+              Access Admin Console Portal →
+            </button>
           </div>
         </div>
-
       </div>
     </div>
   );
