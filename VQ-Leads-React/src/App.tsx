@@ -7,10 +7,16 @@ import {
   useNavigate,
   useParams
 } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type User, type Lead, type SalesTeam, type LeadForm, type Task, type FollowUp, type Commission, type DashboardStats, type DashboardCharts } from './api';
+import { useAuthStore } from './store';
 import { Sidebar } from './components/Sidebar';
 import { LineChart, DonutChart } from './components/CustomCharts';
-import { Modal } from './components/Modal';
+import { Button } from './components/ui/Button';
+import { Card } from './components/ui/Card';
+import { Input } from './components/ui/Input';
+import { Dialog } from './components/ui/Dialog';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from './components/ui/Table';
 import { LeadDetailsDrawer } from './components/LeadDetailsDrawer';
 import { 
   Plus, 
@@ -31,25 +37,26 @@ import {
 
 // --- AUTH GATES ---
 interface ProtectedRouteProps {
-  user: User | null;
   children: React.ReactNode;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ user, children }) => {
-  if (!user) {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  return <div className="app-container">{children}</div>;
+  return <div className="flex w-screen min-h-screen bg-background">{children}</div>;
 };
 
 interface AdminRouteProps {
-  user: User | null;
   children: React.ReactNode;
 }
 
-const AdminRoute: React.FC<AdminRouteProps> = ({ user, children }) => {
-  if (!user) return <Navigate to="/login" replace />;
-  if (user.profile.role !== 'ADMIN') return <Navigate to="/" replace />;
+const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
+  const user = useAuthStore(state => state.user);
+  if (!user || user.profile.role !== 'ADMIN') {
+    return <Navigate to="/" replace />;
+  }
   return <>{children}</>;
 };
 
@@ -60,91 +67,106 @@ const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const login = useAuthStore(state => state.login);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const loginMutation = useMutation({
+    mutationFn: () => api.login(username, password),
+    onSuccess: (data) => {
+      login(data.user, data.token);
+      navigate('/');
+    },
+    onError: (err: any) => {
+      setError(err.message || 'Invalid credentials');
+    }
+  });
+
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
-    try {
-      await api.login(username, password);
-      navigate('/');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid credentials');
-    } finally {
-      setLoading(false);
-    }
+    loginMutation.mutate();
   };
 
-  const handleQuickLogin = async (user: string, pass: string) => {
+  const handleQuickLogin = async (userStr: string, passStr: string) => {
     setError('');
-    setLoading(true);
     try {
-      await api.login(user, pass);
+      const data = await api.login(userStr, passStr);
+      login(data.user, data.token);
       navigate('/');
     } catch (err) {
       setError('Quick login failed');
-    } finally {
-      setLoading(false);
     }
   };
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <div className="login-logo">VQ</div>
-        <div className="login-header">
-          <h2 className="login-title">Sign In</h2>
-          <p className="login-subtitle">Access VQ Leads CRM Portal</p>
+    <div className="w-screen h-screen flex items-center justify-center bg-[radial-gradient(circle_at_10%_20%,rgba(147,51,234,0.08)_0%,rgba(0,0,0,0)_50%)] bg-background">
+      <div className="w-full max-w-[420px] bg-card border border-border/80 rounded-2xl p-8 shadow-2xl backdrop-blur-xl">
+        <div className="h-12 w-12 rounded-xl bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center text-white font-bold text-xl mb-6 mx-auto">
+          VQ
+        </div>
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-foreground">Sign In</h2>
+          <p className="text-sm text-muted-foreground mt-1">Access VQ Leads CRM Portal</p>
         </div>
 
         {error && (
-          <div style={{ background: 'var(--danger-glow)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '10px', borderRadius: '8px', marginBottom: '20px', fontSize: '13px' }}>
+          <div className="bg-destructive/10 border border-destructive/30 text-destructive p-3 rounded-lg mb-5 text-xs text-left">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="form-group">
-            <label className="form-label">Username</label>
-            <input 
+        <form onSubmit={handleLogin} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5 text-left">
+            <label className="text-xs font-semibold text-foreground">Username</label>
+            <Input 
               type="text" 
-              className="form-control" 
               value={username} 
               onChange={e => setUsername(e.target.value)} 
               required 
             />
           </div>
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input 
+          <div className="flex flex-col gap-1.5 text-left">
+            <label className="text-xs font-semibold text-foreground">Password</label>
+            <Input 
               type="password" 
-              className="form-control" 
               value={password} 
               onChange={e => setPassword(e.target.value)} 
               required 
             />
           </div>
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }} disabled={loading}>
-            {loading ? 'Signing In...' : 'Sign In'}
-          </button>
+          <Button type="submit" className="w-full mt-2" disabled={loginMutation.isPending}>
+            {loginMutation.isPending ? 'Signing In...' : 'Sign In'}
+          </Button>
         </form>
 
-        <div className="demo-credentials">
-          <div className="demo-title">Quick Demo Login</div>
-          <div className="demo-buttons">
-            <button className="demo-btn" onClick={() => handleQuickLogin('admin', 'admin123')}>
-              <span>Sarah Conner (Admin)</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>admin</span>
+        <div className="mt-8 border-t border-border/40 pt-6">
+          <div className="text-left text-[11px] font-bold text-foreground uppercase tracking-wider mb-3">
+            Quick Demo Login
+          </div>
+          <div className="flex flex-col gap-2">
+            <button 
+              type="button"
+              className="flex justify-between items-center text-left text-xs bg-muted/20 hover:bg-muted/40 text-muted-foreground hover:text-foreground border border-border/40 hover:border-border p-2.5 rounded-lg transition-all"
+              onClick={() => handleQuickLogin('admin', 'admin123')}
+            >
+              <span className="font-semibold text-foreground">Sarah Conner (Admin)</span>
+              <span className="opacity-60 font-mono">admin</span>
             </button>
-            <button className="demo-btn" onClick={() => handleQuickLogin('agent1', 'agent123')}>
-              <span>Alice Smith (Agent - 8.5%)</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>agent1</span>
+            <button 
+              type="button"
+              className="flex justify-between items-center text-left text-xs bg-muted/20 hover:bg-muted/40 text-muted-foreground hover:text-foreground border border-border/40 hover:border-border p-2.5 rounded-lg transition-all"
+              onClick={() => handleQuickLogin('agent1', 'agent123')}
+            >
+              <span className="font-semibold text-foreground">Alice Smith (Agent - 8.5%)</span>
+              <span className="opacity-60 font-mono">agent1</span>
             </button>
-            <button className="demo-btn" onClick={() => handleQuickLogin('agent2', 'agent123')}>
-              <span>Bob Jones (Agent - 12.0%)</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>agent2</span>
+            <button 
+              type="button"
+              className="flex justify-between items-center text-left text-xs bg-muted/20 hover:bg-muted/40 text-muted-foreground hover:text-foreground border border-border/40 hover:border-border p-2.5 rounded-lg transition-all"
+              onClick={() => handleQuickLogin('agent2', 'agent123')}
+            >
+              <span className="font-semibold text-foreground">Bob Jones (Agent - 12.0%)</span>
+              <span className="opacity-60 font-mono">agent2</span>
             </button>
           </div>
         </div>
@@ -155,156 +177,162 @@ const Login: React.FC = () => {
 
 // 2. DASHBOARD PAGE
 const Dashboard: React.FC<{ user: User }> = ({ user }) => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [charts, setCharts] = useState<DashboardCharts | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
+    queryKey: ['dashboard-stats'],
+    queryFn: api.getDashboardStats,
+  });
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      const s = await api.getDashboardStats();
-      const c = await api.getDashboardCharts();
-      setStats(s);
-      setCharts(c);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: charts, isLoading: chartsLoading } = useQuery<DashboardCharts>({
+    queryKey: ['dashboard-charts'],
+    queryFn: api.getDashboardCharts,
+  });
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  if (loading) {
-    return <div className="page-content"><div className="empty-state">Loading metrics...</div></div>;
+  if (statsLoading || chartsLoading) {
+    return (
+      <div className="p-8 flex items-center justify-center h-[calc(100vh-70px)]">
+        <div className="text-muted-foreground text-sm font-semibold animate-pulse">Loading dashboard metrics...</div>
+      </div>
+    );
   }
 
-  // Format currency
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
   };
 
-  // Convert status map to Donut chart format
   const donutData = stats ? [
-    { label: 'New', value: stats.statusBreakdown.NEW || 0, color: 'var(--info)' },
-    { label: 'Contacted', value: stats.statusBreakdown.CONTACTED || 0, color: 'var(--accent)' },
-    { label: 'In Progress', value: stats.statusBreakdown.IN_PROGRESS || 0, color: 'var(--warning)' },
-    { label: 'Qualified', value: stats.statusBreakdown.QUALIFIED || 0, color: 'var(--success)' },
-    { label: 'Won', value: stats.statusBreakdown.WON || 0, color: '#34d399' },
-    { label: 'Lost', value: stats.statusBreakdown.LOST || 0, color: 'var(--danger)' }
+    { label: 'New', value: stats.statusBreakdown.NEW || 0, color: 'var(--primary)' },
+    { label: 'Contacted', value: stats.statusBreakdown.CONTACTED || 0, color: '#c084fc' },
+    { label: 'In Progress', value: stats.statusBreakdown.IN_PROGRESS || 0, color: '#f59e0b' },
+    { label: 'Qualified', value: stats.statusBreakdown.QUALIFIED || 0, color: 'var(--primary)' },
+    { label: 'Won', value: stats.statusBreakdown.WON || 0, color: '#10b981' },
+    { label: 'Lost', value: stats.statusBreakdown.LOST || 0, color: '#ef4444' }
   ] : [];
 
   return (
-    <div className="page-content">
-      <div className="dashboard-grid">
-        <div className="stat-card accent">
-          <div className="stat-info">
-            <span className="stat-label">Total Leads</span>
-            <span className="stat-value">{stats?.totalLeads || 0}</span>
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="flex items-center justify-between p-6">
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Leads</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{stats?.totalLeads || 0}</span>
           </div>
-          <div className="stat-icon-wrapper">
+          <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center">
             <Briefcase size={22} />
           </div>
-        </div>
+        </Card>
 
-        <div className="stat-card success">
-          <div className="stat-info">
-            <span className="stat-label">Conversion Rate</span>
-            <span className="stat-value">{stats?.conversionRate || 0}%</span>
+        <Card className="flex items-center justify-between p-6">
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Conversion Rate</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{stats?.conversionRate || 0}%</span>
           </div>
-          <div className="stat-icon-wrapper">
+          <div className="h-12 w-12 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 flex items-center justify-center">
             <TrendingUp size={22} />
           </div>
-        </div>
+        </Card>
 
-        <div className="stat-card info">
-          <div className="stat-info">
-            <span className="stat-label">Pipeline Value</span>
-            <span className="stat-value">{formatCurrency(stats?.pipelineValue || 0)}</span>
+        <Card className="flex items-center justify-between p-6">
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pipeline Value</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{formatCurrency(stats?.pipelineValue || 0)}</span>
           </div>
-          <div className="stat-icon-wrapper">
+          <div className="h-12 w-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
             <DollarSign size={22} />
           </div>
-        </div>
+        </Card>
 
-        <div className="stat-card warning">
-          <div className="stat-info">
-            <span className="stat-label">{user.profile.role === 'ADMIN' ? 'Total Commission' : 'My Commission'}</span>
-            <span className="stat-value">{formatCurrency(stats?.earnedCommissions || 0)}</span>
+        <Card className="flex items-center justify-between p-6">
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              {user.profile.role === 'ADMIN' ? 'Total Commissions' : 'My Commissions'}
+            </span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{formatCurrency(stats?.earnedCommissions || 0)}</span>
           </div>
-          <div className="stat-icon-wrapper">
+          <div className="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
             <DollarSign size={22} />
           </div>
-        </div>
+        </Card>
       </div>
 
-      <div className="charts-grid">
-        <div className="chart-card">
-          <div className="chart-header">
-            <h3 className="chart-title">Lead Ingestion Timeline (Past 15 Days)</h3>
+      {/* Main Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 p-6">
+          <div className="mb-6 text-left">
+            <h3 className="text-base font-semibold text-foreground">Lead Ingestion Timeline</h3>
+            <p className="text-xs text-muted-foreground">Inquiries submitted over the past 15 days</p>
           </div>
           {charts && <LineChart data={charts.leadsTimeline} />}
-        </div>
+        </Card>
 
-        <div className="chart-card">
-          <div className="chart-header">
-            <h3 className="chart-title">Status Distribution</h3>
+        <Card className="p-6">
+          <div className="mb-6 text-left">
+            <h3 className="text-base font-semibold text-foreground">Status Funnel</h3>
+            <p className="text-xs text-muted-foreground">Distribution of active pipeline leads</p>
           </div>
           <DonutChart data={donutData} />
-        </div>
+        </Card>
       </div>
 
-      <div className="charts-grid" style={{ gridTemplateColumns: user.profile.role === 'ADMIN' ? '1fr 1fr' : '1fr' }}>
+      {/* Bottom Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {user.profile.role === 'ADMIN' && (
-          <div className="chart-card">
-            <div className="chart-header">
-              <h3 className="chart-title">Agent Performance Leaderboard</h3>
+          <Card className="p-6">
+            <div className="mb-6 text-left">
+              <h3 className="text-base font-semibold text-foreground">Agent Performance Leaderboard</h3>
+              <p className="text-xs text-muted-foreground">Revenue and conversion performance ranking</p>
             </div>
-            <div className="leaderboard-list">
+            <div className="space-y-3">
               {charts?.leaderboard && charts.leaderboard.length > 0 ? (
                 charts.leaderboard.map((item, idx) => (
-                  <div key={idx} className="leaderboard-item">
-                    <span className={`leaderboard-rank rank-${idx + 1}`}>{idx + 1}</span>
-                    <div className="leaderboard-info">
-                      <span className="leaderboard-name">{item.agent}</span>
-                      <span className="leaderboard-meta">Username: {item.username}</span>
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/10">
+                    <div className="flex items-center gap-3">
+                      <span className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        idx === 0 ? 'bg-amber-500 text-black' :
+                        idx === 1 ? 'bg-slate-400 text-black' :
+                        idx === 2 ? 'bg-amber-700 text-white' :
+                        'bg-muted text-muted-foreground'
+                      }`}>
+                        {idx + 1}
+                      </span>
+                      <div className="flex flex-col text-left">
+                        <span className="text-sm font-semibold text-foreground">{item.agent}</span>
+                        <span className="text-[10px] text-muted-foreground">@{item.username}</span>
+                      </div>
                     </div>
-                    <div className="leaderboard-stats">
-                      <div className="leaderboard-revenue">{formatCurrency(item.revenue)}</div>
-                      <div className="leaderboard-won">{item.wonLeads} won leads</div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-green-400">{formatCurrency(item.revenue)}</div>
+                      <div className="text-[10px] text-muted-foreground">{item.wonLeads} deals won</div>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="empty-state">No agent data available</div>
+                <div className="text-sm text-muted-foreground py-8">No agent performance data.</div>
               )}
             </div>
-          </div>
+          </Card>
         )}
 
-        <div className="chart-card">
-          <div className="chart-header">
-            <h3 className="chart-title">Lead Sources</h3>
+        <Card className="p-6">
+          <div className="mb-6 text-left">
+            <h3 className="text-base font-semibold text-foreground">Top Lead Sources</h3>
+            <p className="text-xs text-muted-foreground">Breakdown of ingestion source tags</p>
           </div>
-          <div className="leaderboard-list">
+          <div className="space-y-3">
             {stats?.sourceBreakdown && Object.keys(stats.sourceBreakdown).length > 0 ? (
               Object.entries(stats.sourceBreakdown).map(([source, count], idx) => (
-                <div key={idx} className="leaderboard-item">
-                  <div className="leaderboard-info" style={{ marginLeft: 0 }}>
-                    <span className="leaderboard-name">{source}</span>
-                  </div>
-                  <div className="leaderboard-stats">
-                    <div className="leaderboard-revenue" style={{ color: 'var(--text-h)' }}>{count} Leads</div>
-                  </div>
+                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/10">
+                  <span className="text-sm font-semibold text-foreground">{source}</span>
+                  <span className="text-xs font-bold bg-muted/50 border border-border/60 px-2.5 py-0.5 rounded-full text-foreground/80">
+                    {count} Inquiries
+                  </span>
                 </div>
               ))
             ) : (
-              <div className="empty-state">No source details available</div>
+              <div className="text-sm text-muted-foreground py-8">No lead sources logged yet.</div>
             )}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );
@@ -312,8 +340,7 @@ const Dashboard: React.FC<{ user: User }> = ({ user }) => {
 
 // 3. LEADS BOARD & KANBAN PAGE
 const Leads: React.FC<{ user: User }> = ({ user }) => {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [agents, setAgents] = useState<User[]>([]);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
@@ -331,37 +358,28 @@ const Leads: React.FC<{ user: User }> = ({ user }) => {
   const [newLeadSource, setNewLeadSource] = useState('Manual Entry');
   const [newLeadOwner, setNewLeadOwner] = useState<number | null>(null);
 
-  const fetchLeads = async () => {
-    try {
-      const data = await api.getLeads();
-      setLeads(data);
-      if (user.profile.role === 'ADMIN') {
-        const ags = await api.getAgents();
-        setAgents(ags);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  const isAdmin = user.profile.role === 'ADMIN';
 
-  useEffect(() => {
-    fetchLeads();
-  }, []);
+  // React Query fetch
+  const { data: leads = [], refetch: refetchLeads } = useQuery<Lead[]>({
+    queryKey: ['leads'],
+    queryFn: api.getLeads,
+  });
 
-  const handleCreateLead = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.createLead({
-        name: newLeadName,
-        email: newLeadEmail,
-        phone: newLeadPhone,
-        company: newLeadCompany,
-        value: newLeadValue,
-        source: newLeadSource,
-        owner: newLeadOwner || null,
-        status: 'NEW'
-      });
-      // Reset
+  const { data: agents = [] } = useQuery<User[]>({
+    queryKey: ['agents'],
+    queryFn: api.getAgents,
+    enabled: isAdmin
+  });
+
+  // Mutations
+  const createLeadMutation = useMutation({
+    mutationFn: api.createLead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      setIsModalOpen(false);
+      // Reset fields
       setNewLeadName('');
       setNewLeadEmail('');
       setNewLeadPhone('');
@@ -369,11 +387,36 @@ const Leads: React.FC<{ user: User }> = ({ user }) => {
       setNewLeadValue('0.00');
       setNewLeadSource('Manual Entry');
       setNewLeadOwner(null);
-      setIsModalOpen(false);
-      fetchLeads();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to create lead');
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Failed to create lead');
     }
+  });
+
+  const updateLeadMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number, data: Partial<Lead> }) => api.updateLead(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    }
+  });
+
+  const handleCreateLead = (e: React.FormEvent) => {
+    e.preventDefault();
+    createLeadMutation.mutate({
+      name: newLeadName,
+      email: newLeadEmail,
+      phone: newLeadPhone,
+      company: newLeadCompany,
+      value: newLeadValue,
+      source: newLeadSource,
+      owner: newLeadOwner || null,
+      status: 'NEW'
+    });
+  };
+
+  const moveLeadStatus = (leadId: number, status: string) => {
+    updateLeadMutation.mutate({ id: leadId, data: { status: status as any } });
   };
 
   const filteredLeads = leads.filter(l => {
@@ -390,43 +433,33 @@ const Leads: React.FC<{ user: User }> = ({ user }) => {
 
   const sources = Array.from(new Set(leads.map(l => l.source)));
 
-  // Kanban groupings
   const kanbanColumns = [
-    { id: 'NEW', title: 'New', color: 'new' },
-    { id: 'CONTACTED', title: 'Contacted', color: 'contacted' },
-    { id: 'IN_PROGRESS', title: 'In Progress', color: 'in_progress' },
-    { id: 'QUALIFIED', title: 'Qualified', color: 'qualified' },
-    { id: 'WON', title: 'Won', color: 'won' },
-    { id: 'LOST', title: 'Lost', color: 'lost' }
+    { id: 'NEW', title: 'New', color: 'bg-blue-500' },
+    { id: 'CONTACTED', title: 'Contacted', color: 'bg-purple-500' },
+    { id: 'IN_PROGRESS', title: 'In Progress', color: 'bg-amber-500' },
+    { id: 'QUALIFIED', title: 'Qualified', color: 'bg-primary' },
+    { id: 'WON', title: 'Won', color: 'bg-green-500' },
+    { id: 'LOST', title: 'Lost', color: 'bg-red-500' }
   ];
 
-  const moveLeadStatus = async (leadId: number, status: string) => {
-    try {
-      await api.updateLead(leadId, { status: status as any });
-      fetchLeads();
-    } catch (err) {
-      alert('Error updating status');
-    }
-  };
-
   return (
-    <div className="page-content">
-      <div className="table-controls">
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
-            <input 
+    <div className="p-8 space-y-6">
+      {/* Header Filters & View Switching */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-3 text-muted-foreground" />
+            <Input 
               type="text" 
-              placeholder="Search leads, companies..." 
-              className="search-input" 
-              style={{ paddingLeft: '38px' }}
+              placeholder="Search leads..." 
+              className="pl-9 w-[240px]"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          
+
           <select 
-            className="select-filter"
+            className="flex h-10 rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
           >
@@ -440,7 +473,7 @@ const Leads: React.FC<{ user: User }> = ({ user }) => {
           </select>
 
           <select 
-            className="select-filter"
+            className="flex h-10 rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
             value={sourceFilter}
             onChange={e => setSourceFilter(e.target.value)}
           >
@@ -448,9 +481,9 @@ const Leads: React.FC<{ user: User }> = ({ user }) => {
             {sources.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
 
-          {user.profile.role === 'ADMIN' && (
+          {isAdmin && (
             <select 
-              className="select-filter"
+              className="flex h-10 rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
               value={ownerFilter}
               onChange={e => setOwnerFilter(e.target.value)}
             >
@@ -461,106 +494,119 @@ const Leads: React.FC<{ user: User }> = ({ user }) => {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <div className="view-switcher">
+        <div className="flex items-center gap-3 self-end md:self-auto">
+          {/* Switch view */}
+          <div className="inline-flex items-center justify-center rounded-lg bg-muted/40 p-1 border border-border/40 text-xs">
             <button 
-              className={`switch-btn ${viewMode === 'list' ? 'active' : ''}`}
+              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${viewMode === 'list' ? 'bg-secondary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => setViewMode('list')}
             >
               List
             </button>
             <button 
-              className={`switch-btn ${viewMode === 'kanban' ? 'active' : ''}`}
+              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${viewMode === 'kanban' ? 'bg-secondary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => setViewMode('kanban')}
             >
               Kanban
             </button>
           </div>
 
-          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-            <Plus size={16} /> New Lead
-          </button>
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Plus size={16} className="mr-1.5" /> New Lead
+          </Button>
         </div>
       </div>
 
+      {/* Grid or List render */}
       {viewMode === 'list' ? (
-        <div className="table-card">
-          <table className="crm-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Company</th>
-                <th>Source</th>
-                <th>Value</th>
-                <th>Owner</th>
-                <th>Status</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-            <tbody>
+        <Card className="overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent cursor-default">
+                <TableHead>Name</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Value</TableHead>
+                <TableHead>Owner</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filteredLeads.length === 0 ? (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                    No leads found
-                  </td>
-                </tr>
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                    No leads match your criteria.
+                  </TableCell>
+                </TableRow>
               ) : (
                 filteredLeads.map(l => (
-                  <tr key={l.id} onClick={() => setSelectedLeadId(l.id)}>
-                    <td style={{ fontWeight: '600', color: 'var(--text-h)' }}>{l.name}</td>
-                    <td>{l.company || '-'}</td>
-                    <td>{l.source}</td>
-                    <td style={{ fontWeight: '600' }}>${l.value}</td>
-                    <td>{l.owner_name}</td>
-                    <td>
-                      <span className={`status-badge ${l.status.toLowerCase()}`}>
+                  <TableRow key={l.id} onClick={() => setSelectedLeadId(l.id)}>
+                    <TableCell className="font-semibold text-foreground">{l.name}</TableCell>
+                    <TableCell>{l.company || '-'}</TableCell>
+                    <TableCell>{l.source}</TableCell>
+                    <TableCell className="font-semibold">${l.value}</TableCell>
+                    <TableCell>{l.owner_name}</TableCell>
+                    <TableCell>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                        l.status === 'NEW' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
+                        l.status === 'CONTACTED' ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' :
+                        l.status === 'IN_PROGRESS' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+                        l.status === 'QUALIFIED' ? 'bg-primary/10 border-primary/20 text-primary-foreground' :
+                        l.status === 'WON' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
+                        'bg-red-500/10 border-red-500/20 text-red-400'
+                      }`}>
                         {l.status}
                       </span>
-                    </td>
-                    <td>{new Date(l.created_at).toLocaleDateString()}</td>
-                  </tr>
+                    </TableCell>
+                    <TableCell>{new Date(l.created_at).toLocaleDateString()}</TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       ) : (
-        <div className="kanban-board">
+        <div className="flex gap-4 overflow-x-auto pb-4 items-start select-none">
           {kanbanColumns.map(col => {
             const colLeads = filteredLeads.filter(l => l.status === col.id);
             return (
-              <div key={col.id} className="kanban-column">
-                <div className="kanban-column-header">
-                  <div className="column-title-group">
-                    <span className={`column-indicator ${col.color}`} />
-                    <h4 className="column-title">{col.title}</h4>
+              <div key={col.id} className="flex-1 min-w-[280px] max-w-[340px] bg-card/40 border border-border/80 rounded-xl p-4 flex flex-col max-h-[calc(100vh-190px)] shrink-0">
+                <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${col.color}`} />
+                    <h4 className="text-sm font-semibold text-foreground">{col.title}</h4>
                   </div>
-                  <span className="column-count">{colLeads.length}</span>
+                  <span className="text-[11px] font-bold bg-muted/60 px-2 py-0.5 rounded-full text-muted-foreground">
+                    {colLeads.length}
+                  </span>
                 </div>
-                
-                <div className="kanban-cards-container">
+
+                <div className="flex flex-col gap-3 overflow-y-auto pr-1">
                   {colLeads.map(l => (
                     <div 
                       key={l.id} 
-                      className="kanban-card"
+                      className="bg-card border border-border/80 rounded-lg p-4 cursor-pointer hover:border-border/100 hover:shadow-lg transition-all text-left"
                       onClick={() => setSelectedLeadId(l.id)}
                     >
-                      <h5 className="kanban-card-title">{l.name}</h5>
-                      <div className="kanban-card-company">{l.company || 'No Company'}</div>
-                      <div className="kanban-card-footer">
-                        <span className="kanban-card-value">${l.value}</span>
-                        <span className="kanban-card-owner">{l.owner_name}</span>
-                      </div>
+                      <h5 className="text-sm font-semibold text-foreground leading-snug">{l.name}</h5>
+                      <p className="text-xs text-muted-foreground mt-1 mb-3">{l.company || 'No Company'}</p>
                       
-                      {/* Simple action to slide lead status manually from board */}
-                      <div style={{ display: 'flex', gap: '4px', marginTop: '12px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
+                      <div className="flex justify-between items-center text-xs mt-2 pt-2.5 border-t border-border/40">
+                        <span className="font-semibold text-foreground">${l.value}</span>
+                        <span className="text-[10px] bg-muted/40 border border-border/40 px-1.5 py-0.5 rounded text-muted-foreground max-w-[100px] truncate">
+                          {l.owner_name}
+                        </span>
+                      </div>
+
+                      {/* Manual board transition triggers */}
+                      <div className="flex gap-1.5 mt-3 pt-2 border-t border-border/40 overflow-x-auto justify-end">
                         {kanbanColumns.map(targetCol => {
                           if (targetCol.id === col.id) return null;
                           return (
                             <button
                               key={targetCol.id}
-                              className="btn btn-sm"
-                              style={{ padding: '2px 4px', fontSize: '9px', textTransform: 'uppercase' }}
+                              className="text-[9px] uppercase font-bold px-1 py-0.5 rounded border border-border bg-muted/10 hover:bg-muted/40 hover:text-foreground text-muted-foreground"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 moveLeadStatus(l.id, targetCol.id);
@@ -581,83 +627,72 @@ const Leads: React.FC<{ user: User }> = ({ user }) => {
       )}
 
       {/* New Lead Modal */}
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        title="Add New Lead"
-      >
-        <form onSubmit={handleCreateLead} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="form-group">
-            <label className="form-label">Contact Name</label>
-            <input 
+      <Dialog isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Lead">
+        <form onSubmit={handleCreateLead} className="space-y-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Contact Name</label>
+            <Input 
               type="text" 
-              className="form-control" 
               value={newLeadName} 
               onChange={e => setNewLeadName(e.target.value)} 
               required 
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Company Name</label>
-            <input 
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Company Name</label>
+            <Input 
               type="text" 
-              className="form-control" 
               value={newLeadCompany} 
               onChange={e => setNewLeadCompany(e.target.value)} 
             />
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Email</label>
-              <input 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Email</label>
+              <Input 
                 type="email" 
-                className="form-control" 
                 value={newLeadEmail} 
                 onChange={e => setNewLeadEmail(e.target.value)} 
               />
             </div>
-            <div className="form-group">
-              <label className="form-label">Phone</label>
-              <input 
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Phone</label>
+              <Input 
                 type="text" 
-                className="form-control" 
                 value={newLeadPhone} 
                 onChange={e => setNewLeadPhone(e.target.value)} 
               />
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Deal Value ($)</label>
-              <input 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Deal Value ($)</label>
+              <Input 
                 type="number" 
                 step="0.01"
-                className="form-control" 
                 value={newLeadValue} 
                 onChange={e => setNewLeadValue(e.target.value)} 
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Lead Source</label>
-              <input 
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Lead Source</label>
+              <Input 
                 type="text" 
-                className="form-control" 
                 value={newLeadSource} 
                 onChange={e => setNewLeadSource(e.target.value)} 
               />
             </div>
           </div>
 
-          {user.profile.role === 'ADMIN' && (
-            <div className="form-group">
-              <label className="form-label">Assign Agent (Optional)</label>
+          {isAdmin && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Assign Agent</label>
               <select 
-                className="select-filter"
-                style={{ width: '100%', height: '40px' }}
+                className="flex h-10 w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
                 value={newLeadOwner || ''}
                 onChange={e => setNewLeadOwner(e.target.value ? Number(e.target.value) : null)}
               >
@@ -669,21 +704,23 @@ const Leads: React.FC<{ user: User }> = ({ user }) => {
             </div>
           )}
 
-          <div className="modal-footer" style={{ border: 'none', padding: '10px 0 0 0' }}>
-            <button type="button" className="btn" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Create Lead</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={createLeadMutation.isPending}>
+              {createLeadMutation.isPending ? 'Creating...' : 'Create Lead'}
+            </Button>
           </div>
         </form>
-      </Modal>
+      </Dialog>
 
-      {/* Lead details drawer overlay */}
+      {/* Drawer detailed panel */}
       <LeadDetailsDrawer
         leadId={selectedLeadId || 0}
         isOpen={selectedLeadId !== null}
         onClose={() => setSelectedLeadId(null)}
         currentUser={user}
         agents={agents}
-        onLeadUpdated={fetchLeads}
+        onLeadUpdated={refetchLeads}
       />
     </div>
   );
@@ -691,8 +728,7 @@ const Leads: React.FC<{ user: User }> = ({ user }) => {
 
 // 4. SALES TEAMS PAGE (Admin Only)
 const Teams: React.FC = () => {
-  const [teams, setTeams] = useState<SalesTeam[]>([]);
-  const [agents, setAgents] = useState<User[]>([]);
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // New team states
@@ -710,63 +746,74 @@ const Teams: React.FC = () => {
   const [agentLast, setAgentLast] = useState('');
   const [agentComm, setAgentComm] = useState('10.00');
 
-  const fetchData = async () => {
-    try {
-      const t = await api.getTeams();
-      setTeams(t);
-      const a = await api.getAgents();
-      setAgents(a);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  // React Queries
+  const { data: teams = [] } = useQuery<SalesTeam[]>({
+    queryKey: ['teams'],
+    queryFn: api.getTeams,
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const { data: agents = [] } = useQuery<User[]>({
+    queryKey: ['agents'],
+    queryFn: api.getAgents,
+  });
 
-  const handleCreateTeam = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.createTeam({
-        name: newTeamName,
-        description: newTeamDesc,
-        leader: newTeamLeader,
-        members: newTeamMembers
-      });
+  // Mutations
+  const createTeamMutation = useMutation({
+    mutationFn: api.createTeam,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      setIsModalOpen(false);
       setNewTeamName('');
       setNewTeamDesc('');
       setNewTeamLeader(null);
       setNewTeamMembers([]);
-      setIsModalOpen(false);
-      fetchData();
-    } catch (err) {
-      alert('Error creating team');
     }
-  };
+  });
 
-  const handleRegisterAgent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.createAgent({
-        username: agentUser,
-        password: agentPass,
-        email: agentEmail,
-        first_name: agentFirst,
-        last_name: agentLast,
-        commission_rate: agentComm
-      });
+  const registerAgentMutation = useMutation({
+    mutationFn: api.createAgent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      setIsAgentModalOpen(false);
       setAgentUser('');
       setAgentPass('');
       setAgentEmail('');
       setAgentFirst('');
       setAgentLast('');
       setAgentComm('10.00');
-      setIsAgentModalOpen(false);
-      fetchData();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error creating agent');
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Registration failed');
     }
+  });
+
+  const deleteTeamMutation = useMutation({
+    mutationFn: api.deleteTeam,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+    }
+  });
+
+  const handleCreateTeam = (e: React.FormEvent) => {
+    e.preventDefault();
+    createTeamMutation.mutate({
+      name: newTeamName,
+      description: newTeamDesc,
+      leader: newTeamLeader,
+      members: newTeamMembers
+    });
+  };
+
+  const handleRegisterAgent = (e: React.FormEvent) => {
+    e.preventDefault();
+    registerAgentMutation.mutate({
+      username: agentUser,
+      password: agentPass,
+      email: agentEmail,
+      first_name: agentFirst,
+      last_name: agentLast,
+      commission_rate: agentComm
+    });
   };
 
   const handleMemberToggle = (id: number) => {
@@ -777,61 +824,55 @@ const Teams: React.FC = () => {
     }
   };
 
-  const handleDeleteTeam = async (id: number) => {
+  const handleDeleteTeam = (id: number) => {
     if (!window.confirm('Delete this team?')) return;
-    try {
-      await api.deleteTeam(id);
-      fetchData();
-    } catch (err) {
-      alert('Failed to delete team');
-    }
+    deleteTeamMutation.mutate(id);
   };
 
   return (
-    <div className="page-content">
-      <div className="table-controls" style={{ justifyContent: 'flex-end' }}>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn" onClick={() => setIsAgentModalOpen(true)}>
-            <Plus size={16} /> Register Sales Agent User
-          </button>
-          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-            <Plus size={16} /> Create Sales Team
-          </button>
-        </div>
+    <div className="p-8 space-y-6">
+      <div className="flex justify-end gap-3 border-b border-border/40 pb-4">
+        <Button variant="outline" onClick={() => setIsAgentModalOpen(true)}>
+          <Plus size={16} className="mr-1.5" /> Register Sales Agent User
+        </Button>
+        <Button onClick={() => setIsModalOpen(true)}>
+          <Plus size={16} className="mr-1.5" /> Create Sales Team
+        </Button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {teams.map(t => (
-          <div key={t.id} className="chart-card" style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', minHeight: '280px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <h3 className="chart-title" style={{ fontSize: '18px', color: 'var(--text-h)' }}>{t.name}</h3>
-              <button 
-                className="btn btn-sm" 
-                style={{ color: 'var(--danger)', background: 'transparent', border: 'none' }}
-                onClick={() => handleDeleteTeam(t.id)}
-              >
-                Delete
-              </button>
-            </div>
-            <p style={{ fontSize: '13px', margin: '8px 0 16px 0', color: 'var(--text)', flex: 1 }}>
-              {t.description || 'No description provided.'}
-            </p>
-            
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '13px' }}>
-                <strong style={{ color: 'var(--text-h)' }}>Team Leader: </strong>
-                <span>{t.leader_details?.full_name || 'Unassigned'}</span>
+          <Card key={t.id} className="p-6 flex flex-col justify-between min-h-[280px]">
+            <div className="text-left">
+              <div className="flex justify-between items-start">
+                <h3 className="text-base font-semibold text-foreground leading-snug">{t.name}</h3>
+                <button 
+                  className="text-xs font-medium text-destructive hover:underline"
+                  onClick={() => handleDeleteTeam(t.id)}
+                >
+                  Delete
+                </button>
               </div>
-              <div style={{ fontSize: '13px' }}>
-                <strong style={{ color: 'var(--text-h)' }}>Members ({t.members_details.length}):</strong>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+              <p className="text-xs text-muted-foreground mt-2 mb-6">
+                {t.description || 'No description provided.'}
+              </p>
+            </div>
+            
+            <div className="border-t border-border/40 pt-4 flex flex-col gap-3 text-left">
+              <div className="text-xs">
+                <span className="font-semibold text-foreground">Team Leader: </span>
+                <span className="text-muted-foreground">{t.leader_details?.full_name || 'Unassigned'}</span>
+              </div>
+              <div className="text-xs">
+                <span className="font-semibold text-foreground">Members ({t.members_details.length}):</span>
+                <div className="flex flex-wrap gap-1.5 mt-2">
                   {t.members_details.length === 0 ? (
-                    <span style={{ color: 'var(--text-muted)' }}>No members in team</span>
+                    <span className="text-muted-foreground text-[10px]">No members in team</span>
                   ) : (
                     t.members_details.map(m => (
                       <span 
                         key={m.id} 
-                        style={{ fontSize: '11px', background: 'rgba(255, 255, 255, 0.03)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        className="text-[10px] font-semibold bg-muted/40 border border-border/50 px-2 py-0.5 rounded text-muted-foreground"
                       >
                         {m.full_name}
                       </span>
@@ -840,39 +881,36 @@ const Teams: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
       {/* Create Team Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Sales Team">
-        <form onSubmit={handleCreateTeam} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="form-group">
-            <label className="form-label">Team Name</label>
-            <input 
+      <Dialog isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Sales Team">
+        <form onSubmit={handleCreateTeam} className="space-y-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Team Name</label>
+            <Input 
               type="text" 
-              className="form-control" 
               value={newTeamName} 
               onChange={e => setNewTeamName(e.target.value)} 
               required 
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Description</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Description</label>
             <textarea 
-              className="form-control" 
-              rows={3} 
+              className="flex w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring min-h-[80px]" 
               value={newTeamDesc} 
               onChange={e => setNewTeamDesc(e.target.value)} 
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Team Leader</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Team Leader</label>
             <select 
-              className="select-filter" 
-              style={{ width: '100%', height: '40px' }}
+              className="flex h-10 w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
               value={newTeamLeader || ''} 
               onChange={e => setNewTeamLeader(e.target.value ? Number(e.target.value) : null)}
             >
@@ -883,13 +921,14 @@ const Teams: React.FC = () => {
             </select>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Select Members</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto', border: '1px solid var(--border)', padding: '10px', borderRadius: '8px' }}>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Select Members</label>
+            <div className="flex flex-col gap-2 max-h-[140px] overflow-y-auto border border-border/80 p-3 rounded-lg bg-muted/10">
               {agents.map(a => (
-                <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                <label key={a.id} className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
                   <input 
                     type="checkbox" 
+                    className="rounded border-input text-primary focus:ring-ring bg-muted/20 h-4 w-4"
                     checked={newTeamMembers.includes(a.id)} 
                     onChange={() => handleMemberToggle(a.id)}
                   />
@@ -899,95 +938,93 @@ const Teams: React.FC = () => {
             </div>
           </div>
 
-          <div className="modal-footer" style={{ border: 'none', padding: '10px 0 0 0' }}>
-            <button type="button" className="btn" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Create Team</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={createTeamMutation.isPending}>
+              {createTeamMutation.isPending ? 'Creating...' : 'Create Team'}
+            </Button>
           </div>
         </form>
-      </Modal>
+      </Dialog>
 
       {/* Register Agent Modal */}
-      <Modal isOpen={isAgentModalOpen} onClose={() => setIsAgentModalOpen(false)} title="Register Sales Agent User">
-        <form onSubmit={handleRegisterAgent} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="form-group">
-            <label className="form-label">Username</label>
-            <input 
+      <Dialog isOpen={isAgentModalOpen} onClose={() => setIsAgentModalOpen(false)} title="Register Sales Agent User">
+        <form onSubmit={handleRegisterAgent} className="space-y-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Username</label>
+            <Input 
               type="text" 
-              className="form-control" 
               value={agentUser} 
               onChange={e => setAgentUser(e.target.value)} 
               required 
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input 
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Password</label>
+            <Input 
               type="password" 
-              className="form-control" 
               value={agentPass} 
               onChange={e => setAgentPass(e.target.value)} 
               required 
             />
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">First Name</label>
-              <input 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">First Name</label>
+              <Input 
                 type="text" 
-                className="form-control" 
                 value={agentFirst} 
                 onChange={e => setAgentFirst(e.target.value)} 
               />
             </div>
-            <div className="form-group">
-              <label className="form-label">Last Name</label>
-              <input 
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Last Name</label>
+              <Input 
                 type="text" 
-                className="form-control" 
                 value={agentLast} 
                 onChange={e => setAgentLast(e.target.value)} 
               />
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Email</label>
-              <input 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Email</label>
+              <Input 
                 type="email" 
-                className="form-control" 
                 value={agentEmail} 
                 onChange={e => setAgentEmail(e.target.value)} 
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Commission Rate (%)</label>
-              <input 
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Commission Rate (%)</label>
+              <Input 
                 type="number" 
                 step="0.01"
-                className="form-control" 
                 value={agentComm} 
                 onChange={e => setAgentComm(e.target.value)} 
               />
             </div>
           </div>
 
-          <div className="modal-footer" style={{ border: 'none', padding: '10px 0 0 0' }}>
-            <button type="button" className="btn" onClick={() => setIsAgentModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Register Agent</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+            <Button type="button" variant="outline" onClick={() => setIsAgentModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={registerAgentMutation.isPending}>
+              {registerAgentMutation.isPending ? 'Registering...' : 'Register Agent'}
+            </Button>
           </div>
         </form>
-      </Modal>
+      </Dialog>
     </div>
   );
 };
 
 // 5. LEAD FORMS BUILDER (Admin Only)
 const Forms: React.FC = () => {
-  const [forms, setForms] = useState<LeadForm[]>([]);
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
@@ -997,48 +1034,40 @@ const Forms: React.FC = () => {
   const [mode, setMode] = useState<'MANUAL' | 'ROUND_ROBIN'>('ROUND_ROBIN');
   const [sourceName, setSourceName] = useState('Website Inbound');
 
-  const fetchForms = async () => {
-    try {
-      const data = await api.getForms();
-      setForms(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  // React Queries
+  const { data: forms = [] } = useQuery<LeadForm[]>({
+    queryKey: ['forms'],
+    queryFn: api.getForms,
+  });
 
-  useEffect(() => {
-    fetchForms();
-  }, []);
-
-  const handleCreateForm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.createForm({
-        name,
-        description: desc,
-        assignment_mode: mode,
-        source_name: sourceName,
-        is_active: true
-      });
+  const createFormMutation = useMutation({
+    mutationFn: api.createForm,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+      setIsModalOpen(false);
       setName('');
       setDesc('');
       setMode('ROUND_ROBIN');
       setSourceName('Website Inbound');
-      setIsModalOpen(false);
-      fetchForms();
-    } catch (err) {
-      alert('Error creating lead form');
     }
-  };
+  });
 
-  const handleDeleteForm = async (id: number) => {
-    if (!window.confirm('Delete this lead form?')) return;
-    try {
-      await api.deleteForm(id);
-      fetchForms();
-    } catch (err) {
-      alert('Failed to delete');
+  const deleteFormMutation = useMutation({
+    mutationFn: api.deleteForm,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
     }
+  });
+
+  const handleCreateForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    createFormMutation.mutate({
+      name,
+      description: desc,
+      assignment_mode: mode,
+      source_name: sourceName,
+      is_active: true
+    });
   };
 
   const copyEmbedCode = (id: number) => {
@@ -1050,189 +1079,189 @@ const Forms: React.FC = () => {
   };
 
   return (
-    <div className="page-content">
-      <div className="table-controls" style={{ justifyContent: 'flex-end' }}>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-          <Plus size={16} /> Create Lead Form
-        </button>
+    <div className="p-8 space-y-6">
+      <div className="flex justify-end border-b border-border/40 pb-4">
+        <Button onClick={() => setIsModalOpen(true)}>
+          <Plus size={16} className="mr-1.5" /> Create Lead Form
+        </Button>
       </div>
 
-      <div className="table-card">
-        <table className="crm-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Assignment Mode</th>
-              <th>Source Logged</th>
-              <th>Public URL</th>
-              <th>Code Snippet</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+      <Card className="overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent cursor-default">
+              <TableHead>Form Details</TableHead>
+              <TableHead>Assignment Mode</TableHead>
+              <TableHead>Source Logged</TableHead>
+              <TableHead>Public URL</TableHead>
+              <TableHead>Embed Code</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {forms.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No lead forms created yet.
-                </td>
-              </tr>
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
+                  No forms created yet.
+                </TableCell>
+              </TableRow>
             ) : (
               forms.map(f => (
-                <tr key={f.id}>
-                  <td style={{ fontWeight: '600', color: 'var(--text-h)' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <TableRow key={f.id} className="hover:bg-transparent cursor-default">
+                  <TableCell className="text-left font-semibold text-foreground">
+                    <div className="flex flex-col">
                       <span>{f.name}</span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '400' }}>{f.description}</span>
+                      <span className="text-[11px] font-normal text-muted-foreground mt-0.5">{f.description || 'No description'}</span>
                     </div>
-                  </td>
-                  <td>
-                    <span className={`badge ${f.assignment_mode.toLowerCase()}`}>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                      f.assignment_mode === 'ROUND_ROBIN' 
+                        ? 'bg-primary/10 border-primary/20 text-primary-foreground' 
+                        : 'bg-muted/40 border-border text-muted-foreground'
+                    }`}>
                       {f.assignment_mode.replace('_', ' ')}
                     </span>
-                  </td>
-                  <td>{f.source_name}</td>
-                  <td>
+                  </TableCell>
+                  <TableCell>{f.source_name}</TableCell>
+                  <TableCell>
                     <a 
                       href={`/public-form/${f.id}`} 
                       target="_blank" 
                       rel="noreferrer"
-                      style={{ color: 'var(--info)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      className="text-primary hover:underline inline-flex items-center gap-1 text-xs font-semibold"
                     >
                       Open Form <ExternalLink size={12} />
                     </a>
-                  </td>
-                  <td>
-                    <button className="btn btn-sm" onClick={() => copyEmbedCode(f.id)}>
-                      {copiedId === f.id ? <Check size={12} style={{ color: 'var(--success)' }} /> : <Copy size={12} />}
-                      <span>{copiedId === f.id ? 'Copied Iframe!' : 'Copy Iframe Code'}</span>
-                    </button>
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="outline" size="sm" onClick={() => copyEmbedCode(f.id)} className="h-8 text-xs font-semibold">
+                      {copiedId === f.id ? <Check size={13} className="mr-1 text-green-400" /> : <Copy size={13} className="mr-1" />}
+                      <span>{copiedId === f.id ? 'Copied Code!' : 'Copy Code'}</span>
+                    </Button>
+                  </TableCell>
+                  <TableCell>
                     <button 
-                      className="btn btn-sm" 
-                      style={{ color: 'var(--danger)', background: 'transparent', border: 'none' }}
-                      onClick={() => handleDeleteForm(f.id)}
+                      className="text-xs font-semibold text-destructive hover:underline"
+                      onClick={() => deleteFormMutation.mutate(f.id)}
                     >
                       Delete
                     </button>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </Card>
 
       {/* Create Form Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Lead Submission Form">
-        <form onSubmit={handleCreateForm} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="form-group">
-            <label className="form-label">Form Name</label>
-            <input 
+      <Dialog isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Lead Submission Form">
+        <form onSubmit={handleCreateForm} className="space-y-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Form Name</label>
+            <Input 
               type="text" 
-              className="form-control" 
               value={name} 
               onChange={e => setName(e.target.value)} 
-              placeholder="e.g. Website Signup Portal"
+              placeholder="e.g. Inbound Website Inquiries"
               required 
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Description</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Description</label>
             <textarea 
-              className="form-control" 
-              rows={2} 
+              className="flex w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring min-h-[70px]" 
               value={desc} 
               onChange={e => setDesc(e.target.value)} 
-              placeholder="Describe where this form is displayed"
+              placeholder="Describe where this form layout is integrated"
             />
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Assignment Method</label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Assignment Method</label>
               <select 
-                className="select-filter" 
-                style={{ width: '100%', height: '40px' }}
+                className="flex h-10 w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
                 value={mode} 
                 onChange={e => setMode(e.target.value as any)}
               >
-                <option value="ROUND_ROBIN">Round Robin (Auto)</option>
-                <option value="MANUAL">Manual Routing</option>
+                <option value="ROUND_ROBIN">Round Robin (Celery)</option>
+                <option value="MANUAL">Manual Assignments</option>
               </select>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Logged Lead Source</label>
-              <input 
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Lead Source Tag</label>
+              <Input 
                 type="text" 
-                className="form-control" 
                 value={sourceName} 
                 onChange={e => setSourceName(e.target.value)} 
-                placeholder="e.g. Inbound Campaign"
                 required 
               />
             </div>
           </div>
 
-          <div className="modal-footer" style={{ border: 'none', padding: '10px 0 0 0' }}>
-            <button type="button" className="btn" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Create Form</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={createFormMutation.isPending}>
+              {createFormMutation.isPending ? 'Creating...' : 'Create Form'}
+            </Button>
           </div>
         </form>
-      </Modal>
+      </Dialog>
     </div>
   );
 };
 
 // 6. COMMISSIONS PAGE
 const Commissions: React.FC<{ user: User }> = ({ user }) => {
-  const [commissions, setCommissions] = useState<Commission[]>([]);
+  const queryClient = useQueryClient();
   const isAdmin = user.profile.role === 'ADMIN';
 
-  const fetchCommissions = async () => {
-    try {
-      const data = await api.getCommissions();
-      setCommissions(data);
-    } catch (err) {
-      console.error(err);
+  // React Queries
+  const { data: commissions = [] } = useQuery<Commission[]>({
+    queryKey: ['commissions'],
+    queryFn: api.getCommissions,
+  });
+
+  // Mutations
+  const approveMutation = useMutation({
+    mutationFn: api.approveCommission,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['commissions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     }
+  });
+
+  const payMutation = useMutation({
+    mutationFn: api.payCommission,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['commissions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    }
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: api.rejectCommission,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['commissions'] });
+    }
+  });
+
+  const handleApprove = (id: number) => {
+    approveMutation.mutate(id);
   };
 
-  useEffect(() => {
-    fetchCommissions();
-  }, []);
-
-  const handleApprove = async (id: number) => {
-    try {
-      await api.approveCommission(id);
-      fetchCommissions();
-    } catch (err) {
-      alert('Approval failed');
-    }
+  const handlePay = (id: number) => {
+    payMutation.mutate(id);
   };
 
-  const handlePay = async (id: number) => {
-    try {
-      await api.payCommission(id);
-      fetchCommissions();
-    } catch (err) {
-      alert('Marking as paid failed');
-    }
+  const handleReject = (id: number) => {
+    if (!window.confirm('Reject this commission transaction?')) return;
+    rejectMutation.mutate(id);
   };
-
-  const handleReject = async (id: number) => {
-    if (!window.confirm('Reject this commission?')) return;
-    try {
-      await api.rejectCommission(id);
-      fetchCommissions();
-    } catch (err) {
-      alert('Rejection failed');
-    }
-  };
-
-  // Removed unused status filter arrays
 
   const totalEarned = commissions
     .filter(c => ['APPROVED', 'PAID'].includes(c.status))
@@ -1243,155 +1272,154 @@ const Commissions: React.FC<{ user: User }> = ({ user }) => {
     .reduce((sum, c) => sum + Number(c.amount), 0);
 
   return (
-    <div className="page-content">
-      <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '24px' }}>
-        <div className="stat-card success">
-          <div className="stat-info">
-            <span className="stat-label">Commissions Earned</span>
-            <span className="stat-value">${totalEarned.toFixed(2)}</span>
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      {/* Cards stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="flex items-center justify-between p-6">
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Commissions Earned</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">${totalEarned.toFixed(2)}</span>
           </div>
-          <div className="stat-icon-wrapper">
+          <div className="h-12 w-12 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 flex items-center justify-center">
             <DollarSign size={22} />
           </div>
-        </div>
+        </Card>
 
-        <div className="stat-card warning">
-          <div className="stat-info">
-            <span className="stat-label">Pending Approval</span>
-            <span className="stat-value">${totalPending.toFixed(2)}</span>
+        <Card className="flex items-center justify-between p-6">
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Awaiting Admin Approval</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">${totalPending.toFixed(2)}</span>
           </div>
-          <div className="stat-icon-wrapper">
+          <div className="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
             <Sliders size={22} />
           </div>
-        </div>
+        </Card>
 
-        <div className="stat-card info">
-          <div className="stat-info">
-            <span className="stat-label">Commission Rate</span>
-            <span className="stat-value">{user.profile.commission_rate}%</span>
+        <Card className="flex items-center justify-between p-6">
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personal Rate</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{user.profile.commission_rate}%</span>
           </div>
-          <div className="stat-icon-wrapper">
+          <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center">
             <TrendingUp size={22} />
           </div>
-        </div>
+        </Card>
       </div>
 
-      <div className="table-card">
-        <table className="crm-table">
-          <thead>
-            <tr>
-              <th>Lead</th>
-              <th>Lead Value</th>
-              <th>Agent</th>
-              <th>Commission Rate</th>
-              <th>Payout Amount</th>
-              <th>Status</th>
-              <th>Admin Action</th>
-            </tr>
-          </thead>
-          <tbody>
+      {/* Ledger Table */}
+      <Card className="overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent cursor-default">
+              <TableHead>Lead Account</TableHead>
+              <TableHead>Lead Deal Size</TableHead>
+              <TableHead>Recipient Agent</TableHead>
+              <TableHead>Commission Rate</TableHead>
+              <TableHead>Payout Amount</TableHead>
+              <TableHead>Transaction Status</TableHead>
+              <TableHead>Admin Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {commissions.length === 0 ? (
-              <tr>
-                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No commissions logged.
-                </td>
-              </tr>
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                  No commission records logged.
+                </TableCell>
+              </TableRow>
             ) : (
               commissions.map(c => (
-                <tr key={c.id}>
-                  <td style={{ fontWeight: '600', color: 'var(--text-h)' }}>{c.lead_name}</td>
-                  <td>${c.lead_value}</td>
-                  <td>{c.agent_details.full_name}</td>
-                  <td>{c.rate}%</td>
-                  <td style={{ fontWeight: '600', color: 'var(--success)' }}>${c.amount}</td>
-                  <td>
-                    <span className={`status-badge ${c.status.toLowerCase()}`}>
+                <TableRow key={c.id} className="hover:bg-transparent cursor-default">
+                  <TableCell className="font-semibold text-foreground">{c.lead_name}</TableCell>
+                  <TableCell>${c.lead_value}</TableCell>
+                  <TableCell>{c.agent_details.full_name}</TableCell>
+                  <TableCell>{c.rate}%</TableCell>
+                  <TableCell className="font-bold text-green-400">${c.amount}</TableCell>
+                  <TableCell>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                      c.status === 'PENDING' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+                      c.status === 'APPROVED' ? 'bg-primary/10 border-primary/20 text-primary-foreground' :
+                      c.status === 'PAID' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
+                      'bg-red-500/10 border-red-500/20 text-red-400'
+                    }`}>
                       {c.status}
                     </span>
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     {isAdmin && c.status === 'PENDING' && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="btn btn-sm btn-success" onClick={() => handleApprove(c.id)}>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="h-8 text-xs bg-green-500/10 hover:bg-green-500/20 border-green-500/20 text-green-400" onClick={() => handleApprove(c.id)}>
                           Approve
-                        </button>
-                        <button 
-                          className="btn btn-sm" 
-                          style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
-                          onClick={() => handleReject(c.id)}
-                        >
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-8 text-xs bg-red-500/10 hover:bg-red-500/20 border-red-500/20 text-red-400" onClick={() => handleReject(c.id)}>
                           Reject
-                        </button>
+                        </Button>
                       </div>
                     )}
                     {isAdmin && c.status === 'APPROVED' && (
-                      <button className="btn btn-sm btn-primary" onClick={() => handlePay(c.id)}>
+                      <Button size="sm" className="h-8 text-xs" onClick={() => handlePay(c.id)}>
                         Mark Paid
-                      </button>
+                      </Button>
                     )}
                     {c.status === 'PAID' && (
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <CheckCircle size={12} style={{ color: 'var(--success)' }} /> Fully Disbursed
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CheckCircle size={12} className="text-green-400" /> Disbursed
                       </span>
                     )}
                     {c.status === 'REJECTED' && (
-                      <span style={{ fontSize: '12px', color: 'var(--danger)' }}>Rejected</span>
+                      <span className="text-xs text-red-400">Rejected</span>
                     )}
                     {!isAdmin && c.status === 'PENDING' && (
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Awaiting review</span>
+                      <span className="text-xs text-muted-foreground">Pending Review</span>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </Card>
     </div>
   );
 };
 
 // 7. TASKS & FOLLOWUPS AGENDA PAGE
 const Tasks: React.FC = () => {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [followups, setFollowups] = useState<FollowUp[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchAgenda = async () => {
-    try {
-      setLoading(true);
-      const t = await api.getTasks();
-      setTasks(t);
-      const f = await api.getFollowUps();
-      setFollowups(f);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+  // React Queries
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
+    queryKey: ['tasks'],
+    queryFn: api.getTasks,
+  });
+
+  const { data: followups = [], isLoading: followupsLoading } = useQuery<FollowUp[]>({
+    queryKey: ['followups'],
+    queryFn: api.getFollowUps,
+  });
+
+  // Mutations
+  const toggleTaskMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number, status: string }) => api.updateTask(id, { status: status as any }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
     }
+  });
+
+  const toggleFollowupMutation = useMutation({
+    mutationFn: ({ id, completed }: { id: number, completed: boolean }) => api.updateFollowUp(id, { completed }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['followups'] });
+    }
+  });
+
+  const handleToggleTask = (task: Task) => {
+    const newStatus = task.status === 'PENDING' ? 'COMPLETED' : 'PENDING';
+    toggleTaskMutation.mutate({ id: task.id, status: newStatus });
   };
 
-  useEffect(() => {
-    fetchAgenda();
-  }, []);
-
-  const handleToggleTask = async (task: Task) => {
-    try {
-      const newStatus = task.status === 'PENDING' ? 'COMPLETED' : 'PENDING';
-      await api.updateTask(task.id, { status: newStatus });
-      fetchAgenda();
-    } catch (err) {
-      alert('Error updating task');
-    }
-  };
-
-  const handleToggleFollowup = async (f: FollowUp) => {
-    try {
-      await api.updateFollowUp(f.id, { completed: !f.completed });
-      fetchAgenda();
-    } catch (err) {
-      alert('Error updating reminder');
-    }
+  const handleToggleFollowup = (f: FollowUp) => {
+    toggleFollowupMutation.mutate({ id: f.id, completed: !f.completed });
   };
 
   const formatDate = (dateString: string | null) => {
@@ -1404,8 +1432,12 @@ const Tasks: React.FC = () => {
     });
   };
 
-  if (loading) {
-    return <div className="page-content"><div className="empty-state">Loading agenda...</div></div>;
+  if (tasksLoading || followupsLoading) {
+    return (
+      <div className="p-8 flex items-center justify-center h-[calc(100vh-70px)]">
+        <div className="text-muted-foreground text-sm font-semibold animate-pulse">Loading agenda details...</div>
+      </div>
+    );
   }
 
   const pendingTasks = tasks.filter(t => t.status === 'PENDING');
@@ -1413,83 +1445,93 @@ const Tasks: React.FC = () => {
   const pendingReminders = followups.filter(f => !f.completed);
 
   return (
-    <div className="page-content" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-      {/* Column 1: Tasks */}
-      <div className="chart-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <h3 className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ClipboardCheck size={20} style={{ color: 'var(--accent)' }} />
-          <span>CRM Checklist Tasks</span>
-        </h3>
-        
-        <div className="task-list-container" style={{ flex: 1 }}>
-          <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: 'var(--text-h)', textAlign: 'left' }}>
-            Pending Tasks ({pendingTasks.length})
-          </h4>
-          {pendingTasks.length === 0 ? (
-            <div className="empty-state" style={{ padding: '20px 0' }}>All clear! No pending tasks.</div>
-          ) : (
-            pendingTasks.map(t => (
-              <div key={t.id} className="task-item">
-                <div className="task-checkbox" onClick={() => handleToggleTask(t)}>
-                  <Circle size={16} />
-                </div>
-                <div className="task-details">
-                  <span className="task-title">{t.title}</span>
-                  <div className="task-meta">
-                    {t.lead_name && <span className="task-assigned">Lead: {t.lead_name}</span>}
-                    {t.due_date && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> Due: {formatDate(t.due_date)}</span>}
+    <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
+      {/* Tasks Agenda */}
+      <Card className="p-6 flex flex-col h-[calc(100vh-140px)] overflow-hidden">
+        <div className="flex items-center gap-2 mb-6 border-b border-border/40 pb-3 text-left">
+          <ClipboardCheck className="text-primary" size={20} />
+          <h3 className="text-base font-semibold text-foreground">CRM Checklist Tasks</h3>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-6 pr-1">
+          {/* Pending Tasks */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold text-foreground text-left uppercase tracking-wider mb-2">
+              Pending Checklist ({pendingTasks.length})
+            </h4>
+            {pendingTasks.length === 0 ? (
+              <div className="text-center text-xs text-muted-foreground py-8 border border-dashed border-border/60 rounded-lg">
+                All checklist items are completed!
+              </div>
+            ) : (
+              pendingTasks.map(t => (
+                <div key={t.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/40 hover:border-border transition-all text-left bg-muted/10">
+                  <button type="button" className="text-muted-foreground hover:text-foreground mt-0.5" onClick={() => handleToggleTask(t)}>
+                    <Circle size={16} />
+                  </button>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium text-foreground leading-snug">{t.title}</span>
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-1">
+                      {t.lead_name && <span className="bg-muted px-1.5 py-0.5 rounded text-foreground/80">Lead: {t.lead_name}</span>}
+                      {t.due_date && <span className="flex items-center gap-1"><Calendar size={10} /> Due: {formatDate(t.due_date)}</span>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
 
-          <h4 style={{ margin: '20px 0 8px 0', fontSize: '14px', color: 'var(--text-muted)', textAlign: 'left' }}>
-            Completed Tasks
-          </h4>
-          {completedTasks.map(t => (
-            <div key={t.id} className="task-item" style={{ opacity: 0.6 }}>
-              <div className="task-checkbox checked" onClick={() => handleToggleTask(t)}>
-                <CheckCircle size={16} style={{ color: 'var(--success)' }} />
-              </div>
-              <div className="task-details">
-                <span className="task-title completed">{t.title}</span>
-                <div className="task-meta">
-                  {t.lead_name && <span className="task-assigned">Lead: {t.lead_name}</span>}
+          {/* Completed Tasks */}
+          {completedTasks.length > 0 && (
+            <div className="space-y-3 pt-4 border-t border-border/30">
+              <h4 className="text-xs font-semibold text-muted-foreground text-left uppercase tracking-wider mb-2">
+                Completed Items
+              </h4>
+              {completedTasks.map(t => (
+                <div key={t.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/20 bg-muted/5 opacity-60 text-left">
+                  <button type="button" className="text-green-400 mt-0.5" onClick={() => handleToggleTask(t)}>
+                    <CheckCircle size={16} />
+                  </button>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium text-muted-foreground line-through leading-snug">{t.title}</span>
+                    {t.lead_name && <span className="text-[10px] text-muted-foreground">Lead: {t.lead_name}</span>}
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      </div>
+      </Card>
 
-      {/* Column 2: Followups / Reminders */}
-      <div className="chart-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <h3 className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Calendar size={20} style={{ color: 'var(--info)' }} />
-          <span>Scheduled Lead Follow-ups</span>
-        </h3>
+      {/* Follow-ups Calendar list */}
+      <Card className="p-6 flex flex-col h-[calc(100vh-140px)] overflow-hidden">
+        <div className="flex items-center gap-2 mb-6 border-b border-border/40 pb-3 text-left">
+          <Calendar className="text-blue-400" size={20} />
+          <h3 className="text-base font-semibold text-foreground">Scheduled Client Follow-ups</h3>
+        </div>
 
-        <div className="task-list-container" style={{ flex: 1 }}>
-          <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: 'var(--text-h)', textAlign: 'left' }}>
-            Upcoming Follow-ups ({pendingReminders.length})
+        <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+          <h4 className="text-xs font-semibold text-foreground text-left uppercase tracking-wider mb-2">
+            Upcoming Reminders ({pendingReminders.length})
           </h4>
           {pendingReminders.length === 0 ? (
-            <div className="empty-state" style={{ padding: '20px 0' }}>No follow-up reminders scheduled.</div>
+            <div className="text-center text-xs text-muted-foreground py-8 border border-dashed border-border/60 rounded-lg">
+              No follow-up reminders scheduled.
+            </div>
           ) : (
             pendingReminders.map(f => (
-              <div key={f.id} className="task-item">
-                <div className="task-checkbox" onClick={() => handleToggleFollowup(f)}>
+              <div key={f.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/40 hover:border-border transition-all text-left bg-muted/10">
+                <button type="button" className="text-muted-foreground hover:text-foreground mt-0.5" onClick={() => handleToggleFollowup(f)}>
                   <Circle size={16} />
-                </div>
-                <div className="task-details">
-                  <span className="task-title">{f.notes || 'Unnamed follow-up'}</span>
-                  <div className="task-meta">
-                    <span className="task-assigned" style={{ background: 'var(--info-glow)', color: 'var(--info)' }}>
+                </button>
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-foreground leading-snug">{f.notes || 'No description'}</span>
+                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-1">
+                    <span className="bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded font-semibold border border-blue-500/15">
                       Lead: {f.lead_name}
                     </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Calendar size={11} /> {formatDate(f.scheduled_time)}
+                    <span className="flex items-center gap-1">
+                      <Calendar size={10} /> {formatDate(f.scheduled_time)}
                     </span>
                   </div>
                 </div>
@@ -1497,7 +1539,7 @@ const Tasks: React.FC = () => {
             ))
           )}
         </div>
-      </div>
+      </Card>
     </div>
   );
 };
@@ -1505,11 +1547,6 @@ const Tasks: React.FC = () => {
 // 8. PUBLIC FORM PORTAL
 const PublicForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const [formDetail, setFormDetail] = useState<LeadForm | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  // Fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -1517,9 +1554,11 @@ const PublicForm: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [value, setValue] = useState('0.00');
 
-  // Success details
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [assignedAgent, setAssignedAgent] = useState('');
+  const [formDetail, setFormDetail] = useState<LeadForm | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchForm = async () => {
@@ -1539,68 +1578,73 @@ const PublicForm: React.FC = () => {
     fetchForm();
   }, [id]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id || !name.trim()) return;
-    try {
-      setError('');
-      setLoading(true);
-      const res = await api.submitPublicForm(Number(id), {
-        name,
-        email,
-        phone,
-        company,
-        notes,
-        value
-      });
+  const submitMutation = useMutation({
+    mutationFn: (data: any) => api.submitPublicForm(Number(id), data),
+    onSuccess: (res) => {
       setAssignedAgent(res.assigned_to);
       setSubmitSuccess(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Submission failed. Please check inputs.');
-    } finally {
-      setLoading(false);
+    },
+    onError: (err: any) => {
+      setError(err.message || 'Submission failed. Please check inputs.');
     }
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !name.trim()) return;
+    submitMutation.mutate({
+      name,
+      email,
+      phone,
+      company,
+      notes,
+      value
+    });
   };
 
   if (loading && !submitSuccess) {
-    return <div className="public-form-page"><div className="empty-state">Loading portal...</div></div>;
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-background">
+        <div className="text-muted-foreground text-sm font-semibold animate-pulse">Loading submission portal...</div>
+      </div>
+    );
   }
 
   if (error && !submitSuccess) {
     return (
-      <div className="public-form-page">
-        <div className="public-form-card" style={{ textAlign: 'center' }}>
-          <div className="success-icon-wrapper" style={{ background: 'var(--danger-glow)', color: 'var(--danger)', margin: '0 auto 20px auto' }}>
-            <X size={32} />
+      <div className="w-screen min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-[500px] bg-card border border-border/80 rounded-2xl p-8 shadow-2xl text-center">
+          <div className="h-14 w-14 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto mb-6">
+            <X size={30} />
           </div>
-          <h3 className="success-title">Portal Inaccessible</h3>
-          <p className="success-desc" style={{ marginTop: '10px' }}>{error}</p>
+          <h3 className="text-xl font-bold text-foreground">Portal Inaccessible</h3>
+          <p className="text-sm text-muted-foreground mt-2">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="public-form-page">
-      <div className="public-form-card">
+    <div className="w-screen min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(circle_at_90%_80%,rgba(59,130,246,0.06)_0%,rgba(0,0,0,0)_50%),radial-gradient(circle_at_10%_20%,rgba(168,85,247,0.06)_0%,rgba(0,0,0,0)_50%)] bg-background">
+      <div className="w-full max-w-[550px] bg-card border border-border/80 rounded-2xl p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-blue-500" />
+        
         {submitSuccess ? (
-          <div className="success-container">
-            <div className="success-icon-wrapper">
+          <div className="py-8 text-center flex flex-col items-center justify-center gap-4">
+            <div className="h-16 w-16 rounded-full bg-green-500/10 text-green-400 flex items-center justify-center">
               <Check size={32} />
             </div>
-            <h3 className="success-title">Submission Received</h3>
-            <p className="success-desc">
-              Thank you! Your inquiry has been logged in our systems.
-              <br />
-              {assignedAgent !== 'Unassigned' && (
-                <strong style={{ color: 'var(--text-h)', display: 'block', marginTop: '12px' }}>
-                  Routed directly to Sales Agent: {assignedAgent}
-                </strong>
+            <h3 className="text-2xl font-bold text-foreground mt-2">Submission Received</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-[400px]">
+              Thank you! Your inquiry details have been registered. Our sales team will get back to you shortly.
+              {assignedAgent !== 'Routing in progress (Celery)...' && assignedAgent !== 'Unassigned' && (
+                <span className="block mt-4 text-xs font-semibold text-primary">
+                  Assigned Account Representative: {assignedAgent}
+                </span>
               )}
             </p>
-            <button 
-              className="btn btn-primary" 
-              style={{ marginTop: '20px' }} 
+            <Button 
+              className="mt-6"
               onClick={() => {
                 setName('');
                 setEmail('');
@@ -1612,21 +1656,20 @@ const PublicForm: React.FC = () => {
               }}
             >
               Submit Another Inquiry
-            </button>
+            </Button>
           </div>
         ) : (
           <>
-            <div style={{ textAlign: 'left', marginBottom: '24px' }}>
-              <h2 className="login-title" style={{ margin: 0 }}>{formDetail?.name}</h2>
-              <p className="login-subtitle" style={{ marginTop: '6px' }}>{formDetail?.description || 'Please fill in your requirements below.'}</p>
+            <div className="text-left mb-8">
+              <h2 className="text-xl font-bold text-foreground">{formDetail?.name}</h2>
+              <p className="text-xs text-muted-foreground mt-1">{formDetail?.description || 'Please complete the details below.'}</p>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="form-group">
-                <label className="form-label">Full Name *</label>
-                <input 
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="flex flex-col gap-1 text-left">
+                <label className="text-xs font-semibold text-foreground">Full Name *</label>
+                <Input 
                   type="text" 
-                  className="form-control" 
                   value={name} 
                   onChange={e => setName(e.target.value)} 
                   placeholder="e.g. John Doe"
@@ -1634,22 +1677,20 @@ const PublicForm: React.FC = () => {
                 />
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Email Address</label>
-                  <input 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1 text-left">
+                  <label className="text-xs font-semibold text-foreground">Email Address</label>
+                  <Input 
                     type="email" 
-                    className="form-control" 
                     value={email} 
                     onChange={e => setEmail(e.target.value)} 
                     placeholder="john@example.com"
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Phone Number</label>
-                  <input 
+                <div className="flex flex-col gap-1 text-left">
+                  <label className="text-xs font-semibold text-foreground">Phone Number</label>
+                  <Input 
                     type="text" 
-                    className="form-control" 
                     value={phone} 
                     onChange={e => setPhone(e.target.value)} 
                     placeholder="+1 (555) 000-0000"
@@ -1657,43 +1698,40 @@ const PublicForm: React.FC = () => {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Company Name</label>
-                  <input 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1 text-left">
+                  <label className="text-xs font-semibold text-foreground">Company Name</label>
+                  <Input 
                     type="text" 
-                    className="form-control" 
                     value={company} 
                     onChange={e => setCompany(e.target.value)} 
                     placeholder="e.g. Acme Corp"
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Estimated Deal Size ($)</label>
-                  <input 
+                <div className="flex flex-col gap-1 text-left">
+                  <label className="text-xs font-semibold text-foreground">Estimated Deal Size ($)</label>
+                  <Input 
                     type="number" 
                     step="0.01"
-                    className="form-control" 
                     value={value} 
                     onChange={e => setValue(e.target.value)} 
                   />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Inquiry Message / Notes</label>
+              <div className="flex flex-col gap-1 text-left">
+                <label className="text-xs font-semibold text-foreground">Inquiry Details</label>
                 <textarea 
-                  className="form-control" 
-                  rows={4}
+                  className="flex w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring min-h-[100px]" 
                   value={notes} 
                   onChange={e => setNotes(e.target.value)} 
-                  placeholder="How can our sales team help you?"
+                  placeholder="How can we assist you?"
                 />
               </div>
 
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}>
-                Submit Inquiry
-              </button>
+              <Button type="submit" className="w-full mt-4" disabled={submitMutation.isPending}>
+                {submitMutation.isPending ? 'Submitting...' : 'Submit Inquiry'}
+              </Button>
             </form>
           </>
         )}
@@ -1709,10 +1747,7 @@ interface WorkspaceLayoutProps {
   children: React.ReactNode;
 }
 
-const WorkspaceLayout: React.FC<WorkspaceLayoutProps> = ({ user, children }) => {
-  // useNavigate is not needed in this layout wrapper
-
-  // Simple page title selector
+const WorkspaceLayout: React.FC<WorkspaceLayoutProps> = ({ children }) => {
   const getPageTitle = () => {
     const path = window.location.pathname;
     if (path === '/') return 'Dashboard Overview';
@@ -1726,17 +1761,17 @@ const WorkspaceLayout: React.FC<WorkspaceLayoutProps> = ({ user, children }) => 
 
   return (
     <>
-      <Sidebar user={user} />
-      <main className="main-content">
-        <header className="top-header">
-          <h2 className="page-title">{getPageTitle()}</h2>
-          <div className="header-actions">
-            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              Server Time: {new Date().toLocaleDateString()}
+      <Sidebar />
+      <main className="flex-1 flex flex-col h-screen overflow-y-auto bg-background relative">
+        <header className="h-[70px] border-b border-border/80 flex items-center justify-between px-8 bg-card/40 backdrop-blur-xl sticky top-0 z-40">
+          <h2 className="text-lg font-bold text-foreground">{getPageTitle()}</h2>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium text-muted-foreground bg-muted/40 px-3 py-1 rounded-full border border-border/40">
+              Server: {new Date().toLocaleDateString()}
             </span>
           </div>
         </header>
-        <div style={{ flex: 1 }}>
+        <div className="flex-1">
           {children}
         </div>
       </main>
@@ -1746,19 +1781,7 @@ const WorkspaceLayout: React.FC<WorkspaceLayoutProps> = ({ user, children }) => 
 
 // --- CORE APP ---
 function App() {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('vq_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  useEffect(() => {
-    const handleAuth = () => {
-      const saved = localStorage.getItem('vq_user');
-      setUser(saved ? JSON.parse(saved) : null);
-    };
-    window.addEventListener('auth_change', handleAuth);
-    return () => window.removeEventListener('auth_change', handleAuth);
-  }, []);
+  const user = useAuthStore(state => state.user);
 
   return (
     <Router>
@@ -1776,7 +1799,7 @@ function App() {
         <Route 
           path="/" 
           element={
-            <ProtectedRoute user={user}>
+            <ProtectedRoute>
               {user && <WorkspaceLayout user={user}><Dashboard user={user} /></WorkspaceLayout>}
             </ProtectedRoute>
           } 
@@ -1785,7 +1808,7 @@ function App() {
         <Route 
           path="/leads" 
           element={
-            <ProtectedRoute user={user}>
+            <ProtectedRoute>
               {user && <WorkspaceLayout user={user}><Leads user={user} /></WorkspaceLayout>}
             </ProtectedRoute>
           } 
@@ -1794,8 +1817,8 @@ function App() {
         <Route 
           path="/teams" 
           element={
-            <ProtectedRoute user={user}>
-              <AdminRoute user={user}>
+            <ProtectedRoute>
+              <AdminRoute>
                 {user && <WorkspaceLayout user={user}><Teams /></WorkspaceLayout>}
               </AdminRoute>
             </ProtectedRoute>
@@ -1805,8 +1828,8 @@ function App() {
         <Route 
           path="/forms" 
           element={
-            <ProtectedRoute user={user}>
-              <AdminRoute user={user}>
+            <ProtectedRoute>
+              <AdminRoute>
                 {user && <WorkspaceLayout user={user}><Forms /></WorkspaceLayout>}
               </AdminRoute>
             </ProtectedRoute>
@@ -1816,7 +1839,7 @@ function App() {
         <Route 
           path="/commissions" 
           element={
-            <ProtectedRoute user={user}>
+            <ProtectedRoute>
               {user && <WorkspaceLayout user={user}><Commissions user={user} /></WorkspaceLayout>}
             </ProtectedRoute>
           } 
@@ -1825,7 +1848,7 @@ function App() {
         <Route 
           path="/tasks" 
           element={
-            <ProtectedRoute user={user}>
+            <ProtectedRoute>
               {user && <WorkspaceLayout user={user}><Tasks /></WorkspaceLayout>}
             </ProtectedRoute>
           } 

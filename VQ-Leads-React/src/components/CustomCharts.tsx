@@ -122,8 +122,8 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
       >
         <defs>
           <linearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.0" />
+            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.0" />
           </linearGradient>
         </defs>
 
@@ -178,7 +178,7 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
           <path 
             d={pathD} 
             fill="none" 
-            stroke="var(--accent)" 
+            stroke="var(--primary)" 
             strokeWidth="2.5" 
             strokeLinecap="round" 
             strokeLinejoin="round" 
@@ -192,8 +192,8 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
             cx={p.x}
             cy={p.y}
             r={hoverIndex === idx ? 6 : 3}
-            fill={hoverIndex === idx ? 'var(--accent-hover)' : 'var(--bg)'}
-            stroke="var(--accent)"
+            fill={hoverIndex === idx ? 'var(--primary)' : 'var(--background)'}
+            stroke="var(--primary)"
             strokeWidth="2"
             style={{ cursor: 'pointer', transition: 'r 0.1s ease' }}
           />
@@ -276,8 +276,8 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
           display: 'flex',
           flexDirection: 'column'
         }}>
-          <span style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-h)' }}>{total}</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Leads</span>
+          <span className="text-2xl font-bold text-foreground">{total}</span>
+          <span className="text-[10px] text-muted-foreground uppercase font-semibold">Leads</span>
         </div>
       </div>
 
@@ -291,16 +291,10 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
         boxSizing: 'border-box' 
       }}>
         {data.map((item, idx) => (
-          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', textAlign: 'left' }}>
-            <span style={{ 
-              width: '10px', 
-              height: '10px', 
-              borderRadius: '50%', 
-              backgroundColor: item.color,
-              flexShrink: 0 
-            }} />
-            <span style={{ color: 'var(--text)', flex: 1, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{item.label}</span>
-            <span style={{ fontWeight: '600', color: 'var(--text-h)' }}>{item.value}</span>
+          <div key={idx} className="flex items-center gap-2 text-xs text-left">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+            <span className="text-muted-foreground flex-1 truncate">{item.label}</span>
+            <span className="font-semibold text-foreground">{item.value}</span>
           </div>
         ))}
       </div>
