@@ -22,6 +22,10 @@ import { Commissions } from './modules/commissions';
 import { TasksPage } from './modules/tasks';
 import { Reports } from './modules/reports';
 import { Settings } from './modules/settings';
+import { Activities } from './modules/activities';
+import FollowUps from './modules/followups';
+import { Notifications } from './modules/notifications';
+import { AuditLogs } from './modules/audit-logs';
 
 // --- AUTH GATES ---
 interface ProtectedRouteProps {
@@ -172,6 +176,57 @@ function App() {
                   <TasksPage />
                 </AdminLayout>
               )}
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/activities" 
+          element={
+            <ProtectedRoute>
+              {user && (
+                <AdminLayout>
+                  <Activities />
+                </AdminLayout>
+              )}
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/followups" 
+          element={
+            <ProtectedRoute>
+              {user && (
+                <AdminLayout>
+                  <FollowUps />
+                </AdminLayout>
+              )}
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/notifications" 
+          element={
+            <ProtectedRoute>
+              {user && (
+                <AdminLayout>
+                  <Notifications />
+                </AdminLayout>
+              )}
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/audit-logs" 
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                {user && (
+                  <AdminLayout>
+                    <AuditLogs />
+                  </AdminLayout>
+                )}
+              </AdminRoute>
             </ProtectedRoute>
           } 
         />
