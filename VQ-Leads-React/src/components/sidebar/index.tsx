@@ -50,7 +50,7 @@ export const Sidebar: React.FC = () => {
 
   const navItems: NavItem[] = [
     { 
-      path: '/', 
+      path: '/dashboard', 
       label: 'Dashboard', 
       icon: LayoutDashboard, 
       roles: ['ADMIN', 'LEADER', 'AGENT'] 

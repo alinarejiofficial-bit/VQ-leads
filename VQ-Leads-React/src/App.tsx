@@ -26,6 +26,7 @@ import { Activities } from './modules/activities';
 import FollowUps from './modules/followups';
 import { Notifications } from './modules/notifications';
 import { AuditLogs } from './modules/audit-logs';
+import { LandingPage } from './modules/landing';
 
 // --- AUTH GATES ---
 interface ProtectedRouteProps {
@@ -47,7 +48,7 @@ interface AdminRouteProps {
 const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   const user = useAuthStore(state => state.user);
   if (!user || user.profile.role !== 'ADMIN') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;
 };
@@ -59,7 +60,7 @@ interface LeaderOrAdminRouteProps {
 const LeaderOrAdminRoute: React.FC<LeaderOrAdminRouteProps> = ({ children }) => {
   const user = useAuthStore(state => state.user);
   if (!user || (user.profile.role !== 'ADMIN' && user.profile.role !== 'LEADER')) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;
 };
@@ -88,7 +89,7 @@ function App() {
           path="/login" 
           element={
             isAuthenticated ? (
-              <Navigate to="/" replace />
+              <Navigate to="/dashboard" replace />
             ) : (
               <AuthLayout>
                 <Login />
@@ -97,9 +98,12 @@ function App() {
           } 
         />
 
+        {/* Public Landing Page */}
+        <Route path="/" element={<LandingPage />} />
+
         {/* Protected Pages wrapped in AdminLayout */}
         <Route 
-          path="/" 
+          path="/dashboard" 
           element={
             <ProtectedRoute>
               {user && (

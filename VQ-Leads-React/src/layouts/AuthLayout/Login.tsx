@@ -17,7 +17,7 @@ export const Login: React.FC = () => {
     mutationFn: () => api.login(username, password),
     onSuccess: (data) => {
       login(data.user, data.token);
-      navigate('/');
+      navigate('/dashboard');
     },
     onError: (err: any) => {
       setError(err.message || 'Invalid credentials');
@@ -35,7 +35,7 @@ export const Login: React.FC = () => {
     try {
       const data = await api.login(userStr, passStr);
       login(data.user, data.token);
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       setError('Quick login failed');
     }
