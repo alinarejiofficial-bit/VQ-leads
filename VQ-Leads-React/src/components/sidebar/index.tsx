@@ -205,7 +205,7 @@ export const Sidebar: React.FC = () => {
           </div>
           <div className="flex flex-col text-left">
             <span className="font-bold text-base text-foreground leading-tight">
-              Brisk
+              VQ Leads
             </span>
             <span className="text-[10px] font-semibold text-muted-foreground">
               CR Management
