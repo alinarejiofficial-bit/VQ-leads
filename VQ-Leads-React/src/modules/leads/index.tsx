@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { api, type User, type Lead } from '../../api';
 import { Button } from '../../components/forms/Button';
 import { Card } from '../../components/common/Card';
@@ -9,17 +10,34 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '.
 import { LeadDetailsDrawer } from './components/LeadDetailsDrawer';
 import { Plus, Search, Download } from 'lucide-react';
 
+// Mapping of lead status to Tailwind color classes
+const statusColors: Record<string, { bg: string; border: string; text: string }> = {
+  NEW: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400' },
+  AVAILABLE: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400' },
+  CLAIMED: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400' },
+  CONTACTED: { bg: 'bg-orange-500/10', border: 'border-orange-500/20', text: 'text-orange-400' },
+  QUALIFIED: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-400' },
+  FOLLOW_UP: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', text: 'text-yellow-400' },
+  PROPOSAL_SENT: { bg: 'bg-teal-500/10', border: 'border-teal-500/20', text: 'text-teal-400' },
+  NEGOTIATION: { bg: 'bg-pink-500/10', border: 'border-pink-500/20', text: 'text-pink-400' },
+  CONVERTED: { bg: 'bg-green-500/10', border: 'border-green-500/20', text: 'text-green-400' },
+  LOST: { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' },
+  DUPLICATE: { bg: 'bg-gray-500/10', border: 'border-gray-500/20', text: 'text-gray-400' },
+  INVALID: { bg: 'bg-gray-800/10', border: 'border-gray-800/20', text: 'text-gray-300' },
+};
+
 interface LeadsProps {
   user: User;
 }
 
 export const Leads: React.FC<LeadsProps> = ({ user }) => {
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
 
@@ -35,11 +53,42 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const isAdmin = user.profile.role === 'ADMIN';
   const isLeaderOrAdmin = isAdmin || user.profile.role === 'LEADER';
 
-  // React Query fetch
+  // Apply URL filters
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const filter = params.get('filter');
+    // reset all filters first
+    setStatusFilter('');
+    setOwnerFilter('');
+
+    if (filter) {
+      switch (filter) {
+        case 'available':
+          setStatusFilter('AVAILABLE');
+          break;
+        case 'claimed':
+          setStatusFilter('CLAIMED');
+          break;
+        case 'my':
+          setOwnerFilter(String(user.id));
+          break;
+        case 'converted':
+          setStatusFilter('CONVERTED');
+          break;
+        case 'lost':
+          setStatusFilter('LOST');
+          break;
+        default:
+          break;
+      }
+    }
+  }, [location.search, user]);
   const { data: leads = [], refetch: refetchLeads } = useQuery<Lead[]>({
     queryKey: ['leads'],
     queryFn: api.getLeads,
   });
+
+
 
   const { data: agents = [] } = useQuery<User[]>({
     queryKey: ['agents'],
@@ -140,11 +189,17 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
 
   const kanbanColumns = [
     { id: 'NEW', title: 'New', color: 'bg-blue-500' },
-    { id: 'CONTACTED', title: 'Contacted', color: 'bg-purple-500' },
-    { id: 'IN_PROGRESS', title: 'In Progress', color: 'bg-amber-500' },
-    { id: 'QUALIFIED', title: 'Qualified', color: 'bg-primary' },
-    { id: 'WON', title: 'Won', color: 'bg-green-500' },
-    { id: 'LOST', title: 'Lost', color: 'bg-red-500' }
+    { id: 'AVAILABLE', title: 'Available', color: 'bg-cyan-500' },
+    { id: 'CLAIMED', title: 'Claimed', color: 'bg-purple-500' },
+    { id: 'CONTACTED', title: 'Contacted', color: 'bg-orange-500' },
+    { id: 'QUALIFIED', title: 'Qualified', color: 'bg-indigo-500' },
+    { id: 'FOLLOW_UP', title: 'Follow‑up', color: 'bg-yellow-500' },
+    { id: 'PROPOSAL_SENT', title: 'Proposal Sent', color: 'bg-teal-500' },
+    { id: 'NEGOTIATION', title: 'Negotiation', color: 'bg-pink-500' },
+    { id: 'CONVERTED', title: 'Converted', color: 'bg-green-500' },
+    { id: 'LOST', title: 'Lost', color: 'bg-red-500' },
+    { id: 'DUPLICATE', title: 'Duplicate', color: 'bg-gray-500' },
+    { id: 'INVALID', title: 'Invalid', color: 'bg-gray-800' },
   ];
 
   return (
@@ -170,11 +225,17 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
           >
             <option value="">All Statuses</option>
             <option value="NEW">New</option>
+            <option value="AVAILABLE">Available</option>
+            <option value="CLAIMED">Claimed</option>
             <option value="CONTACTED">Contacted</option>
-            <option value="IN_PROGRESS">In Progress</option>
             <option value="QUALIFIED">Qualified</option>
-            <option value="WON">Won</option>
+            <option value="FOLLOW_UP">Follow-up</option>
+            <option value="PROPOSAL_SENT">Proposal Sent</option>
+            <option value="NEGOTIATION">Negotiation</option>
+            <option value="CONVERTED">Converted</option>
             <option value="LOST">Lost</option>
+            <option value="DUPLICATE">Duplicate</option>
+            <option value="INVALID">Invalid</option>
           </select>
 
           <select 
@@ -234,6 +295,8 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             <TableHeader>
               <TableRow className="hover:bg-transparent cursor-default">
                 <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Value</TableHead>
@@ -245,27 +308,32 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             <TableBody>
               {filteredLeads.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                     No leads match your criteria.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredLeads.map(l => (
-                  <TableRow key={l.id} onClick={() => setSelectedLeadId(l.id)}>
-                    <TableCell className="font-semibold text-foreground">{l.name}</TableCell>
+                  filteredLeads.map(l => (
+                  <TableRow
+                    key={l.id}
+                    className="cursor-pointer hover:bg-muted/30 transition-colors"
+                    onClick={() => setSelectedLeadId(l.id)}
+                  >
+                    <TableCell className="font-semibold text-foreground">
+                      <div>{l.name}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">Click to view details →</div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{l.email || '-'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{l.phone || '-'}</TableCell>
                     <TableCell>{l.company || '-'}</TableCell>
                     <TableCell>{l.source}</TableCell>
                     <TableCell className="font-semibold">${l.value}</TableCell>
-                    <TableCell>{l.owner_name}</TableCell>
+                    <TableCell>{l.owner_name || <span className="text-muted-foreground text-xs italic">Unassigned</span>}</TableCell>
                     <TableCell>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
-                        l.status === 'NEW' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
-                        l.status === 'CONTACTED' ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' :
-                        l.status === 'IN_PROGRESS' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
-                        l.status === 'QUALIFIED' ? 'bg-primary/10 border-primary/20 text-primary-foreground' :
-                        l.status === 'WON' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
-                        'bg-red-500/10 border-red-500/20 text-red-400'
-                      }`}>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${(() => {
+                        const colors = statusColors[l.status];
+                        return colors ? `${colors.bg} ${colors.border} ${colors.text}` : 'bg-gray-500/10 border-gray-500/20 text-gray-400';
+                      })()}`}>
                         {l.status}
                       </span>
                     </TableCell>
@@ -308,6 +376,8 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                           {l.owner_name}
                         </span>
                       </div>
+
+
 
                       {/* Manual board transition triggers */}
                       <div className="flex gap-1.5 mt-3 pt-2 border-t border-border/40 overflow-x-auto justify-end">

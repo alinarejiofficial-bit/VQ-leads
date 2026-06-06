@@ -96,7 +96,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
           <div className="mt-3">
             <span className="text-xl font-bold text-foreground">{totalLeads}</span>
-            <span className="text-[9px] font-bold text-green-500 block mt-1">▲ 8% vs last week</span>
           </div>
         </Card>
 
@@ -108,7 +107,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
           <div className="mt-3">
             <span className="text-xl font-bold text-foreground">{availableLeads}</span>
-            <span className="text-[9px] font-bold text-green-500 block mt-1">▲ 5% vs last week</span>
           </div>
         </Card>
 
@@ -120,7 +118,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
           <div className="mt-3">
             <span className="text-xl font-bold text-foreground">{assignedLeads}</span>
-            <span className="text-[9px] font-bold text-green-500 block mt-1">▲ 6% vs last week</span>
           </div>
         </Card>
 
@@ -132,7 +129,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
           <div className="mt-3">
             <span className="text-xl font-bold text-foreground">{claimedLeads}</span>
-            <span className="text-[9px] font-bold text-green-500 block mt-1">▲ 4% vs last week</span>
           </div>
         </Card>
 
@@ -144,7 +140,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
           <div className="mt-3">
             <span className="text-xl font-bold text-foreground">{convertedLeads}</span>
-            <span className="text-[9px] font-bold text-green-500 block mt-1">▲ 12% vs last week</span>
           </div>
         </Card>
 
@@ -156,7 +151,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
           <div className="mt-3">
             <span className="text-xl font-bold text-foreground">{lostLeads}</span>
-            <span className="text-[9px] font-bold text-red-500 block mt-1">▼ 3% vs last week</span>
           </div>
         </Card>
 
@@ -168,7 +162,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
           <div className="mt-3">
             <span className="text-xl font-bold text-foreground">{todayLeads}</span>
-            <span className="text-[9px] font-bold text-green-500 block mt-1">New submissions</span>
           </div>
         </Card>
 
@@ -180,7 +173,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
           <div className="mt-3 truncate">
             <span className="text-xl font-bold text-foreground">{formatIndianCurrency(pipelineValue)}</span>
-            <span className="text-[9px] font-bold text-green-500 block mt-1">▲ 18% vs last month</span>
           </div>
         </Card>
 
@@ -192,7 +184,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
           <div className="mt-3 truncate">
             <span className="text-xl font-bold text-foreground">{formatIndianCurrency(earnedCommissions)}</span>
-            <span className="text-[9px] font-bold text-green-500 block mt-1">▲ 15% vs last month</span>
           </div>
         </Card>
 
@@ -204,7 +195,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
           <div className="mt-3">
             <span className="text-xl font-bold text-foreground">{followupsDue}</span>
-            <span className="text-[9px] font-bold text-green-500 block mt-1">▲ 5% vs yesterday</span>
           </div>
         </Card>
       </div>
