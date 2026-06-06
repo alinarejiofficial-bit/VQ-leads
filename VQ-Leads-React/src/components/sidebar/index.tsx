@@ -43,10 +43,6 @@ export const Sidebar: React.FC = () => {
     logout();
   };
 
-  const toggleMenu = (label: string) => {
-    setOpenMenus(prev => ({ ...prev, [label]: !prev[label] }));
-  };
-
   const navItems: NavItem[] = [
     { 
       path: '/dashboard', 
@@ -219,14 +215,14 @@ export const Sidebar: React.FC = () => {
             const IconComponent = item.icon;
             const isActive = isPathActive(item.path);
             const hasChildren = item.children && item.children.length > 0;
-            const isOpen = openMenus[item.label] || isActive;
+            const isOpen = openMenus[item.label] ?? isActive;
 
             return (
               <div key={item.label} className="animate-fade-in" style={{ animationDelay: '50ms' }}>
                 {/* Parent Item */}
                 {hasChildren ? (
                   <button
-                    onClick={() => toggleMenu(item.label)}
+                    onClick={() => setOpenMenus(prev => ({ ...prev, [item.label]: !isOpen }))}
                     className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 hover:translate-x-0.5 cursor-pointer ${
                       isActive 
                         ? 'bg-primary/10 text-primary font-semibold shadow-sm shadow-primary/5' 
