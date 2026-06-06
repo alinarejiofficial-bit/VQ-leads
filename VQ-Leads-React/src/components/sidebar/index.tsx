@@ -10,7 +10,8 @@ import {
   LogOut,
   FolderOpen,
   BarChart3,
-  Settings
+  Settings,
+  ChevronDown
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -35,22 +36,39 @@ export const Sidebar: React.FC = () => {
     { path: '/settings', label: 'Settings', icon: Settings, roles: ['ADMIN'] },
   ];
 
-
   const filteredItems = navItems.filter(item => item.roles.includes(user.profile.role));
 
   return (
-    <aside className="w-64 bg-card border-r border-border h-screen flex flex-col justify-between p-4 shrink-0">
-      <div className="flex flex-col flex-1">
-        <div className="flex items-center gap-3 px-2 py-4 border-b border-border/40 mb-6">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center text-white font-bold">
-            VQ
+    <aside className="w-64 bg-card border-r border-border h-screen flex flex-col justify-between p-4 shrink-0 overflow-y-auto">
+      <div className="flex flex-col flex-1 text-left">
+        {/* Brand Header */}
+        <div className="flex items-center gap-3 px-2 py-4 mb-2">
+          <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20">
+            <span className="text-xl">❖</span>
           </div>
-          <span className="font-bold text-lg text-foreground bg-gradient-to-r from-white to-primary/80 bg-clip-text text-transparent">
-            VQ Leads
-          </span>
+          <div className="flex flex-col text-left">
+            <span className="font-bold text-base text-foreground leading-tight">
+              Brisk
+            </span>
+            <span className="text-[10px] font-semibold text-muted-foreground">
+              CR Management
+            </span>
+          </div>
         </div>
 
-        <ul className="flex flex-col gap-1.5">
+        {/* Dropdown Selector */}
+        <div className="flex items-center justify-between border border-border rounded-xl px-3 py-2 bg-secondary/50 mb-6 cursor-pointer select-none">
+          <div className="flex items-center gap-2">
+            <div className="h-5 w-5 rounded bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
+              M
+            </div>
+            <span className="text-xs font-semibold text-foreground">Mesh</span>
+          </div>
+          <ChevronDown size={14} className="text-muted-foreground" />
+        </div>
+
+        {/* Navigation Items */}
+        <ul className="flex flex-col gap-1">
           {filteredItems.map(item => {
             const IconComponent = item.icon;
             const isActive = location.pathname === item.path;
@@ -58,13 +76,13 @@ export const Sidebar: React.FC = () => {
               <li key={item.path}>
                 <Link 
                   to={item.path}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border border-transparent ${
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                     isActive 
-                      ? 'bg-accent/80 text-accent-foreground border-primary/20 shadow-sm' 
+                      ? 'bg-secondary text-primary font-semibold shadow-sm' 
                       : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
                   }`}
                 >
-                  <IconComponent size={18} />
+                  <IconComponent size={18} className={isActive ? 'text-primary' : 'text-muted-foreground'} />
                   <span>{item.label}</span>
                 </Link>
               </li>
@@ -73,32 +91,46 @@ export const Sidebar: React.FC = () => {
         </ul>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 border border-border/40">
-          <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center font-semibold text-white">
-            {user.first_name ? user.first_name[0] : user.username[0].toUpperCase()}
+      <div className="flex flex-col gap-4 mt-6">
+        {/* Cloud Storage Widget */}
+        <div className="p-4 rounded-xl bg-secondary/50 border border-border flex flex-col gap-3">
+          <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+            <span>Cloud Storage</span>
+            <span>90%</span>
           </div>
-          <div className="flex flex-col text-left overflow-hidden">
-            <span className="text-xs font-semibold text-foreground truncate">{user.full_name}</span>
-            <span className={`text-[9px] w-fit font-bold uppercase rounded px-1.5 py-0.5 mt-0.5 border ${
-              user.profile.role === 'ADMIN' 
-                ? 'bg-red-500/10 border-red-500/30 text-red-400' 
-                : user.profile.role === 'LEADER'
-                ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-                : 'bg-green-500/10 border-green-500/30 text-green-400'
-            }`}>
-              {user.profile.role}
-            </span>
+          <div className="w-full bg-secondary h-1.5 rounded-full overflow-hidden">
+            <div className="bg-orange-500 h-full rounded-full" style={{ width: '90%' }} />
           </div>
+          <div className="text-[10px] text-muted-foreground font-medium text-left">
+            1.8 GB of 2 GB used
+          </div>
+          <button className="flex items-center justify-between w-full bg-primary hover:bg-primary/95 text-primary-foreground text-xs font-bold py-2 px-3 rounded-lg transition-all mt-1 cursor-pointer">
+            <span>Upgrade Storage</span>
+            <span className="text-xs font-bold">+</span>
+          </button>
         </div>
 
-        <button 
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-all text-left" 
-          onClick={handleLogout}
-        >
-          <LogOut size={18} />
-          <span>Log Out</span>
-        </button>
+        {/* User Card */}
+        <div className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/40">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center font-semibold text-white">
+              {user.first_name ? user.first_name[0] : user.username[0].toUpperCase()}
+            </div>
+            <div className="flex flex-col text-left overflow-hidden">
+              <span className="text-xs font-semibold text-foreground truncate">{user.full_name}</span>
+              <span className="text-[9px] font-bold uppercase text-primary">
+                {user.profile.role}
+              </span>
+            </div>
+          </div>
+          <button 
+            className="text-destructive hover:bg-destructive/10 p-1.5 rounded-lg transition-all" 
+            onClick={handleLogout}
+            title="Log Out"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
       </div>
     </aside>
   );
