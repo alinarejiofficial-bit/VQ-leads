@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { api, type Lead, type LeadActivity, type Task, type FollowUp, type User } from '../api';
-import { Button } from './ui/Button';
-import { Input } from './ui/Input';
+import { api, type Lead, type LeadActivity, type Task, type FollowUp, type User } from '../../../api';
+import { Button } from '../../../components/forms/Button';
+import { Input } from '../../../components/forms/Input';
 import { 
   X, 
   Calendar, 

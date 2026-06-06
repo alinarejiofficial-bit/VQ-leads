@@ -55,7 +55,6 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
     areaD = `M ${points[0].x} ${height - padding.bottom}`;
     
     for (let i = 1; i < points.length; i++) {
-      // Draw straight line for simplicity and accuracy
       pathD += ` L ${points[i].x} ${points[i].y}`;
     }
     
@@ -151,7 +150,7 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
           </g>
         ))}
 
-        {/* X Axis labels (every 2-3 dates to avoid overcrowding) */}
+        {/* X Axis labels */}
         {points.map((p, idx) => {
           if (idx % (data.length > 10 ? 3 : 2) !== 0) return null;
           return (
@@ -233,7 +232,6 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
       <div style={{ position: 'relative', width: size, height: size }}>
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-          {/* Base circle background */}
           <circle
             cx={center}
             cy={center}
@@ -242,7 +240,6 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
             stroke="rgba(255, 255, 255, 0.02)"
             strokeWidth={strokeWidth}
           />
-          {/* Segments */}
           {data.map((item, idx) => {
             if (item.value === 0) return null;
             const percentage = item.value / total;
