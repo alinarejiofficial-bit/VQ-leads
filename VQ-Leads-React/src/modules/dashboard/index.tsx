@@ -8,15 +8,12 @@ import {
   UserCheck, 
   UserPlus, 
   Sparkles, 
-  Briefcase, 
   Clock, 
   IndianRupee, 
   DollarSign, 
   Calendar, 
-  TrendingUp, 
   ChevronDown,
   XCircle,
-  Percent,
   CheckCircle2
 } from 'lucide-react';
 
