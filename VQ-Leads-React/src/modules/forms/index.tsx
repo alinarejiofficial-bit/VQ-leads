@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { api, type LeadForm } from '../../api';
 import { Button } from '../../components/forms/Button';
 import { Card } from '../../components/common/Card';
@@ -13,17 +14,27 @@ export const Forms: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const tab = searchParams.get('tab') || 'forms';
+  const action = searchParams.get('action');
+
   // Form states
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
   const [mode, setMode] = useState<'MANUAL' | 'ROUND_ROBIN'>('ROUND_ROBIN');
   const [sourceName, setSourceName] = useState('Website Inbound');
 
-  // React Queries
   const { data: forms = [] } = useQuery<LeadForm[]>({
     queryKey: ['forms'],
     queryFn: api.getForms,
   });
+
+  React.useEffect(() => {
+    if (action === 'create') {
+      setIsModalOpen(true);
+    }
+  }, [action]);
 
   const createFormMutation = useMutation({
     mutationFn: api.createForm,
@@ -65,13 +76,25 @@ export const Forms: React.FC = () => {
 
   return (
     <div className="p-8 space-y-6">
-      <div className="flex justify-end border-b border-border/40 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-border/40 pb-4 gap-4">
+        <div className="flex gap-4">
+          {[
+            { id: 'forms', label: 'All Forms', path: '/forms' },
+            { id: 'submissions', label: 'Submissions', path: '/forms?tab=submissions' },
+            { id: 'embed', label: 'Embed Codes', path: '/forms?tab=embed' }
+          ].map(t => (
+            <a key={t.id} href={t.path} className={`pb-4 -mb-4 px-2 text-sm font-medium ${tab === t.id ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+              {t.label}
+            </a>
+          ))}
+        </div>
         <Button onClick={() => setIsModalOpen(true)}>
           <Plus size={16} className="mr-1.5" /> Create Lead Form
         </Button>
       </div>
 
-      <Card className="overflow-hidden">
+      {tab === 'forms' && (
+        <Card className="overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent cursor-default">
@@ -139,6 +162,19 @@ export const Forms: React.FC = () => {
           </TableBody>
         </Table>
       </Card>
+      )}
+
+      {tab === 'submissions' && (
+        <div className="p-6 bg-card rounded-xl border border-border/40 text-muted-foreground text-left">
+          <p>This is the Submissions view. Shows all form submissions across all active forms.</p>
+        </div>
+      )}
+
+      {tab === 'embed' && (
+        <div className="p-6 bg-card rounded-xl border border-border/40 text-muted-foreground text-left">
+          <p>This is the Embed Codes view. Provides centralized access to all iframe and script embed codes for your forms.</p>
+        </div>
+      )}
 
       {/* Create Form Modal */}
       <Dialog isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Lead Submission Form">

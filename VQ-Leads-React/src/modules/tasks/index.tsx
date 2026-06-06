@@ -1,11 +1,16 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { api, type Task } from '../../api';
 import { Card } from '../../components/common/Card';
 import { ClipboardCheck, Circle, CheckCircle, Calendar } from 'lucide-react';
 
 export const TasksList: React.FC = () => {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const filter = searchParams.get('filter');
+  const view = searchParams.get('view');
 
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ['tasks'],
@@ -42,6 +47,23 @@ export const TasksList: React.FC = () => {
 
   const pendingTasks = tasks.filter(t => t.status === 'PENDING');
   const completedTasks = tasks.filter(t => t.status === 'COMPLETED');
+  
+  const showPending = !filter || filter === 'pending';
+  const showCompleted = !filter || filter === 'completed';
+
+  if (view === 'calendar') {
+    return (
+      <Card className="p-6 flex flex-col h-[calc(100vh-140px)] overflow-hidden">
+        <div className="flex items-center gap-2 mb-6 border-b border-border/40 pb-3 text-left">
+          <Calendar className="text-primary" size={20} />
+          <h3 className="text-base font-semibold text-foreground">Tasks Calendar View</h3>
+        </div>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+          Calendar view placeholder.
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-6 flex flex-col h-[calc(100vh-140px)] overflow-hidden">
@@ -52,6 +74,7 @@ export const TasksList: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto space-y-6 pr-1">
         {/* Pending Tasks */}
+        {showPending && (
         <div className="space-y-3">
           <h4 className="text-xs font-semibold text-foreground text-left uppercase tracking-wider mb-2">
             Pending Checklist ({pendingTasks.length})
@@ -77,9 +100,10 @@ export const TasksList: React.FC = () => {
             ))
           )}
         </div>
+        )}
 
         {/* Completed Tasks */}
-        {completedTasks.length > 0 && (
+        {showCompleted && completedTasks.length > 0 && (
           <div className="space-y-3 pt-4 border-t border-border/30">
             <h4 className="text-xs font-semibold text-muted-foreground text-left uppercase tracking-wider mb-2">
               Completed Items

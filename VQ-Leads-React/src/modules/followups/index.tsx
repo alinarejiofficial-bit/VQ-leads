@@ -1,11 +1,16 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { api, type FollowUp } from '../../api';
 import { Card } from '../../components/common/Card';
 import { Calendar, Circle } from 'lucide-react';
 
 export const FollowUpsList: React.FC = () => {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const filter = searchParams.get('filter');
+  const view = searchParams.get('view');
 
   const { data: followups = [], isLoading } = useQuery<FollowUp[]>({
     queryKey: ['followups'],
@@ -39,7 +44,29 @@ export const FollowUpsList: React.FC = () => {
     );
   }
 
-  const pendingReminders = followups.filter(f => !f.completed);
+  let pendingReminders = followups.filter(f => !f.completed);
+  
+  if (filter === 'today') {
+    const today = new Date().toISOString().split('T')[0];
+    pendingReminders = pendingReminders.filter(f => f.scheduled_time && f.scheduled_time.startsWith(today));
+  } else if (filter === 'overdue') {
+    const now = new Date();
+    pendingReminders = pendingReminders.filter(f => f.scheduled_time && new Date(f.scheduled_time) < now);
+  }
+
+  if (view === 'calendar') {
+    return (
+      <Card className="p-6 flex flex-col h-[calc(100vh-140px)] overflow-hidden">
+        <div className="flex items-center gap-2 mb-6 border-b border-border/40 pb-3 text-left">
+          <Calendar className="text-blue-400" size={20} />
+          <h3 className="text-base font-semibold text-foreground">Follow-ups Calendar View</h3>
+        </div>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+          Calendar view placeholder.
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-6 flex flex-col h-[calc(100vh-140px)] overflow-hidden">
@@ -50,7 +77,7 @@ export const FollowUpsList: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         <h4 className="text-xs font-semibold text-foreground text-left uppercase tracking-wider mb-2">
-          Upcoming Reminders ({pendingReminders.length})
+          {filter === 'today' ? 'Today\'s Reminders' : filter === 'overdue' ? 'Overdue Reminders' : 'Upcoming Reminders'} ({pendingReminders.length})
         </h4>
         {pendingReminders.length === 0 ? (
           <div className="text-center text-xs text-muted-foreground py-8 border border-dashed border-border/60 rounded-lg">

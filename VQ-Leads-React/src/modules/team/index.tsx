@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { api, type SalesTeam, type User } from '../../api';
 import { Button } from '../../components/forms/Button';
 import { Card } from '../../components/common/Card';
@@ -9,6 +10,10 @@ import { Plus } from 'lucide-react';
 
 export const Teams: React.FC = () => {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const tab = searchParams.get('tab') || 'members';
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // New team states
@@ -111,14 +116,29 @@ export const Teams: React.FC = () => {
 
   return (
     <div className="p-8 space-y-6">
-      <div className="flex justify-end gap-3 border-b border-border/40 pb-4">
-        <Button variant="outline" onClick={() => setIsAgentModalOpen(true)}>
-          <Plus size={16} className="mr-1.5" /> Register Sales Agent User
-        </Button>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <Plus size={16} className="mr-1.5" /> Create Sales Team
-        </Button>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-4">
+        <div className="flex gap-4">
+          {[
+            { id: 'members', label: 'Members', path: '/teams' },
+            { id: 'roles', label: 'Roles', path: '/teams?tab=roles' },
+            { id: 'performance', label: 'Performance', path: '/teams?tab=performance' }
+          ].map(t => (
+            <a key={t.id} href={t.path} className={`pb-4 -mb-4 px-2 text-sm font-medium ${tab === t.id ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+              {t.label}
+            </a>
+          ))}
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setIsAgentModalOpen(true)}>
+            <Plus size={16} className="mr-1.5" /> Register Sales Agent User
+          </Button>
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Plus size={16} className="mr-1.5" /> Create Sales Team
+          </Button>
+        </div>
       </div>
+
+      {tab === 'members' && (
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {teams.map(t => (
@@ -164,6 +184,19 @@ export const Teams: React.FC = () => {
           </Card>
         ))}
       </div>
+      )}
+
+      {tab === 'roles' && (
+        <div className="p-6 bg-card rounded-xl border border-border/40 text-muted-foreground text-left">
+          <p>This is the Roles view. Here you can configure permissions and access levels for different team roles.</p>
+        </div>
+      )}
+
+      {tab === 'performance' && (
+        <div className="p-6 bg-card rounded-xl border border-border/40 text-muted-foreground text-left">
+          <p>This is the Performance view. Shows team metrics, conversion rates, and leaderboard.</p>
+        </div>
+      )}
 
       {/* Create Team Modal */}
       <Dialog isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Sales Team">

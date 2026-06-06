@@ -1,10 +1,15 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { api, type DashboardStats, type DashboardCharts } from '../../api';
 import { Card } from '../../components/common/Card';
 import { BarChart3, TrendingUp, Users, DollarSign, PieChart, Landmark } from 'lucide-react';
 
 export const Reports: React.FC = () => {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const tab = searchParams.get('tab') || 'leads';
+
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: api.getDashboardStats,
@@ -33,6 +38,22 @@ export const Reports: React.FC = () => {
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto text-left">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-4">
+        <div className="flex gap-4">
+          {[
+            { id: 'leads', label: 'Lead Reports', path: '/reports?tab=leads' },
+            { id: 'conversions', label: 'Conversions', path: '/reports?tab=conversions' },
+            { id: 'sources', label: 'Sources', path: '/reports?tab=sources' },
+            { id: 'team', label: 'Team', path: '/reports?tab=team' },
+            { id: 'commissions', label: 'Commissions', path: '/reports?tab=commissions' }
+          ].map(t => (
+            <a key={t.id} href={t.path} className={`pb-4 -mb-4 px-2 text-sm font-medium ${tab === t.id ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+              {t.label}
+            </a>
+          ))}
+        </div>
+      </div>
+
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="p-6 flex items-center justify-between">
@@ -184,6 +205,12 @@ export const Reports: React.FC = () => {
           )}
         </div>
       </Card>
+      
+      {tab !== 'leads' && tab !== 'conversions' && tab !== 'sources' && tab !== 'team' && tab !== 'commissions' && (
+        <div className="p-6 bg-card rounded-xl border border-border/40 text-muted-foreground text-left">
+          <p>Please select a valid report tab.</p>
+        </div>
+      )}
     </div>
   );
 };

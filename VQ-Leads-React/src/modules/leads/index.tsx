@@ -62,24 +62,14 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
     setOwnerFilter('');
 
     if (filter) {
-      switch (filter) {
-        case 'available':
-          setStatusFilter('AVAILABLE');
-          break;
-        case 'claimed':
-          setStatusFilter('CLAIMED');
-          break;
-        case 'my':
-          setOwnerFilter(String(user.id));
-          break;
-        case 'converted':
-          setStatusFilter('CONVERTED');
-          break;
-        case 'lost':
-          setStatusFilter('LOST');
-          break;
-        default:
-          break;
+      if (filter === 'my') {
+        setOwnerFilter(String(user.id));
+      } else {
+        const validStatuses = ['NEW', 'AVAILABLE', 'CLAIMED', 'CONTACTED', 'QUALIFIED', 'FOLLOW_UP', 'PROPOSAL_SENT', 'NEGOTIATION', 'CONVERTED', 'LOST', 'DUPLICATE', 'INVALID'];
+        const formattedFilter = filter.toUpperCase();
+        if (validStatuses.includes(formattedFilter)) {
+          setStatusFilter(formattedFilter);
+        }
       }
     }
   }, [location.search, user]);

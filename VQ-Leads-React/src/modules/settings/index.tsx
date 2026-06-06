@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Card } from '../../components/common/Card';
+import { useLocation } from 'react-router-dom';
 import { Button } from '../../components/forms/Button';
 import { Input } from '../../components/forms/Input';
 import { Sliders, LayoutGrid, CheckSquare, Save } from 'lucide-react';
 
 export const Settings: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'crm' | 'routing' | 'commissions'>('crm');
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const activeTab = searchParams.get('tab') || 'general';
 
   // CRM preferences
   const [crmName, setCrmName] = useState('VQ Leads CRM');
@@ -28,45 +31,75 @@ export const Settings: React.FC = () => {
   return (
     <div className="p-8 max-w-4xl mx-auto text-left space-y-6">
       {/* Tab Selectors */}
-      <div className="flex border-b border-border/80 pb-0.5 select-none gap-2">
-        <button
-          onClick={() => setActiveTab('crm')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 -mb-[2px] transition-all capitalize ${
-            activeTab === 'crm' 
+      <div className="flex border-b border-border/80 pb-0.5 select-none gap-2 overflow-x-auto">
+        <a
+          href="/settings"
+          className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 -mb-[2px] transition-all capitalize whitespace-nowrap ${
+            activeTab === 'general' || activeTab === 'crm' 
               ? 'text-primary-foreground border-primary' 
               : 'text-muted-foreground hover:text-foreground border-transparent'
           }`}
         >
           <LayoutGrid size={14} />
-          CRM Settings
-        </button>
-        <button
-          onClick={() => setActiveTab('routing')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 -mb-[2px] transition-all capitalize ${
-            activeTab === 'routing' 
+          General
+        </a>
+        <a
+          href="/settings?tab=leads"
+          className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 -mb-[2px] transition-all capitalize whitespace-nowrap ${
+            activeTab === 'leads' || activeTab === 'routing'
               ? 'text-primary-foreground border-primary' 
               : 'text-muted-foreground hover:text-foreground border-transparent'
           }`}
         >
           <Sliders size={14} />
-          Round-Robin Routing
-        </button>
-        <button
-          onClick={() => setActiveTab('commissions')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 -mb-[2px] transition-all capitalize ${
+          Leads & Routing
+        </a>
+        <a
+          href="/settings?tab=commissions"
+          className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 -mb-[2px] transition-all capitalize whitespace-nowrap ${
             activeTab === 'commissions' 
               ? 'text-primary-foreground border-primary' 
               : 'text-muted-foreground hover:text-foreground border-transparent'
           }`}
         >
           <CheckSquare size={14} />
-          Commissions Settings
-        </button>
+          Commissions
+        </a>
+        <a
+          href="/settings?tab=email"
+          className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 -mb-[2px] transition-all capitalize whitespace-nowrap ${
+            activeTab === 'email' 
+              ? 'text-primary-foreground border-primary' 
+              : 'text-muted-foreground hover:text-foreground border-transparent'
+          }`}
+        >
+          Email
+        </a>
+        <a
+          href="/settings?tab=notifications"
+          className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 -mb-[2px] transition-all capitalize whitespace-nowrap ${
+            activeTab === 'notifications' 
+              ? 'text-primary-foreground border-primary' 
+              : 'text-muted-foreground hover:text-foreground border-transparent'
+          }`}
+        >
+          Notifications
+        </a>
+        <a
+          href="/settings?tab=api"
+          className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 -mb-[2px] transition-all capitalize whitespace-nowrap ${
+            activeTab === 'api' 
+              ? 'text-primary-foreground border-primary' 
+              : 'text-muted-foreground hover:text-foreground border-transparent'
+          }`}
+        >
+          API
+        </a>
       </div>
 
       <form onSubmit={handleSave}>
         <Card className="p-8 space-y-6 bg-card border border-border/85 rounded-xl shadow-xl">
-          {activeTab === 'crm' && (
+          {(activeTab === 'general' || activeTab === 'crm') && (
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-bold text-foreground">CRM General Preferences</h3>
@@ -114,7 +147,7 @@ export const Settings: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'routing' && (
+          {(activeTab === 'leads' || activeTab === 'routing') && (
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-bold text-foreground">Round-Robin Inbound Routing</h3>
@@ -175,6 +208,33 @@ export const Settings: React.FC = () => {
                 <label htmlFor="mandatory-approval" className="text-xs font-semibold text-foreground cursor-pointer">
                   Require Mandatory Admin Approval for Commission Payouts
                 </label>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'email' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Email Settings</h3>
+                <p className="text-xs text-muted-foreground">Configure SMTP and outgoing email settings.</p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Notification Preferences</h3>
+                <p className="text-xs text-muted-foreground">Manage alerts, webhooks, and push notifications.</p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'api' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-foreground">API Settings</h3>
+                <p className="text-xs text-muted-foreground">Manage API keys and integration webhooks.</p>
               </div>
             </div>
           )}
