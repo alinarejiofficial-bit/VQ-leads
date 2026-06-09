@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, type User, type DashboardStats, type DashboardCharts } from '../../api';
 import { LineChart, DonutChart } from '../../components/charts/CustomCharts';
 import { Card } from '../../components/common/Card';
+import { AgentDashboard } from './AgentDashboard';
 import { 
   Users, 
   IndianRupee, 
@@ -59,6 +60,11 @@ const DEMO_DATA = {
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
+  // Route agents to their dedicated dashboard
+  if (user.profile.role === 'AGENT') {
+    return <AgentDashboard user={user} />;
+  }
+
   const [revenueTimeframe, setRevenueTimeframe] = useState<'1D' | '1W' | '1M' | '6M' | '1Y'>('1Y');
   const [recentLeads, setRecentLeads] = useState(DEMO_DATA.recentLeads);
 

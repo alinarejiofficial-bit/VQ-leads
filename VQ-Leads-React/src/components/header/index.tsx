@@ -22,18 +22,22 @@ export const Header: React.FC = () => {
 
       {/* Actions, Notifications & Profile */}
       <div className="flex flex-wrap items-center gap-3.5 ml-auto">
-        <button 
-          onClick={() => navigate('/leads')}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/95 transition-all shadow-sm shadow-primary/10 cursor-pointer"
-        >
-          <Plus size={13} /> Add Lead
-        </button>
-        <button 
-          onClick={() => navigate('/leads')}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary border border-border text-foreground text-xs font-bold hover:bg-secondary/80 transition-all cursor-pointer"
-        >
-          <FileSpreadsheet size={13} /> Import Excel
-        </button>
+        {user?.profile.role !== 'AGENT' && (
+          <>
+            <button 
+              onClick={() => navigate('/leads')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/95 transition-all shadow-sm shadow-primary/10 cursor-pointer"
+            >
+              <Plus size={13} /> Add Lead
+            </button>
+            <button 
+              onClick={() => navigate('/leads')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary border border-border text-foreground text-xs font-bold hover:bg-secondary/80 transition-all cursor-pointer"
+            >
+              <FileSpreadsheet size={13} /> Import Excel
+            </button>
+          </>
+        )}
         {user?.profile.role === 'ADMIN' && (
           <button 
             onClick={() => navigate('/forms')}

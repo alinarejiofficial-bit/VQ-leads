@@ -9,26 +9,32 @@ import { Shield, Users, ArrowRight } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [roleTab, setRoleTab] = useState<'agent' | 'admin'>('agent');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [adminUsername, setAdminUsername] = useState('admin');
+  const [adminPassword, setAdminPassword] = useState('admin123');
+  const [agentUsername, setAgentUsername] = useState('agent1');
+  const [agentPassword, setAgentPassword] = useState('agent123');
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const login = useAuthStore(state => state.login);
 
-  // Sync inputs with state when active form changes
+  // Clear error on tab switch
   useEffect(() => {
     setError('');
-    if (roleTab === 'admin') {
-      setUsername('admin');
-      setPassword('admin123');
-    } else {
-      setUsername('agent1');
-      setPassword('agent123');
-    }
   }, [roleTab]);
 
+  // Get active credentials based on current tab
+  const getCredentials = () => {
+    if (roleTab === 'admin') {
+      return { username: adminUsername, password: adminPassword };
+    }
+    return { username: agentUsername, password: agentPassword };
+  };
+
   const loginMutation = useMutation({
-    mutationFn: () => api.login(username, password),
+    mutationFn: () => {
+      const { username, password } = getCredentials();
+      return api.login(username, password);
+    },
     onSuccess: (data) => {
       login(data.user, data.token);
       navigate('/dashboard');
@@ -46,8 +52,6 @@ export const Login: React.FC = () => {
 
   const handleQuickLogin = async (userStr: string, passStr: string) => {
     setError('');
-    setUsername(userStr);
-    setPassword(passStr);
     try {
       const data = await api.login(userStr, passStr);
       login(data.user, data.token);
@@ -127,8 +131,8 @@ export const Login: React.FC = () => {
               <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Username</label>
               <Input 
                 type="text" 
-                value={username} 
-                onChange={e => setUsername(e.target.value)} 
+                value={adminUsername} 
+                onChange={e => setAdminUsername(e.target.value)} 
                 required 
                 className="bg-card/50 focus:bg-card hover:border-border/80 transition-all text-sm h-11"
               />
@@ -138,8 +142,8 @@ export const Login: React.FC = () => {
               <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
               <Input 
                 type="password" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
+                value={adminPassword} 
+                onChange={e => setAdminPassword(e.target.value)} 
                 required 
                 className="bg-card/50 focus:bg-card hover:border-border/80 transition-all text-sm h-11"
               />
@@ -199,8 +203,8 @@ export const Login: React.FC = () => {
               <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Username</label>
               <Input 
                 type="text" 
-                value={username} 
-                onChange={e => setUsername(e.target.value)} 
+                value={agentUsername} 
+                onChange={e => setAgentUsername(e.target.value)} 
                 required 
                 className="bg-card/50 focus:bg-card hover:border-border/80 transition-all text-sm h-11"
               />
@@ -210,8 +214,8 @@ export const Login: React.FC = () => {
               <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
               <Input 
                 type="password" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
+                value={agentPassword} 
+                onChange={e => setAgentPassword(e.target.value)} 
                 required 
                 className="bg-card/50 focus:bg-card hover:border-border/80 transition-all text-sm h-11"
               />
