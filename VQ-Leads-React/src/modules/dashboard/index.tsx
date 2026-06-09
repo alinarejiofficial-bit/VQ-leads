@@ -4,6 +4,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type User, type Lead, type FollowUp, type Commission, type DashboardStats, type DashboardCharts } from '../../api';
 import { LineChart, DonutChart } from '../../components/charts/CustomCharts';
 import { Card } from '../../components/common/Card';
+import { Dialog } from '../../components/common/Dialog';
+import { Button } from '../../components/forms/Button';
+import { Input } from '../../components/forms/Input';
 import { AgentDashboard } from './AgentDashboard';
 import { 
   Users, 
@@ -19,7 +22,8 @@ import {
   ListTodo,
   Check,
   UserPlus,
-  Download
+  Download,
+  Plus
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -34,6 +38,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
   const queryClient = useQueryClient();
   const [revenueTimeframe, setRevenueTimeframe] = useState<'1D' | '1W' | '1M' | '6M' | '1Y'>('1Y');
+
+  // Add Lead States
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newLeadName, setNewLeadName] = useState('');
+  const [newLeadEmail, setNewLeadEmail] = useState('');
+  const [newLeadPhone, setNewLeadPhone] = useState('');
+  const [newLeadCompany, setNewLeadCompany] = useState('');
+  const [newLeadValue, setNewLeadValue] = useState('0.00');
+  const [newLeadSource, setNewLeadSource] = useState('Manual Entry');
+  const [newLeadOwner, setNewLeadOwner] = useState<number | null>(null);
 
   // Fetch real data
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
@@ -78,6 +92,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     },
   });
 
+  const createLeadMutation = useMutation({
+    mutationFn: api.createLead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-charts'] });
+      setIsAddModalOpen(false);
+      // Reset form fields
+      setNewLeadName('');
+      setNewLeadEmail('');
+      setNewLeadPhone('');
+      setNewLeadCompany('');
+      setNewLeadValue('0.00');
+      setNewLeadSource('Manual Entry');
+      setNewLeadOwner(null);
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Failed to create lead');
+    }
+  });
+
   const handleClaimLead = (leadId: number) => {
     updateLeadMutation.mutate({
       id: leadId,
@@ -89,6 +124,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     updateLeadMutation.mutate({
       id: leadId,
       data: { status: e.target.value as any }
+    });
+  };
+
+  const handleCreateLead = (e: React.FormEvent) => {
+    e.preventDefault();
+    createLeadMutation.mutate({
+      name: newLeadName,
+      email: newLeadEmail,
+      phone: newLeadPhone,
+      company: newLeadCompany,
+      value: newLeadValue,
+      source: newLeadSource,
+      owner: newLeadOwner || null,
+      status: 'NEW'
     });
   };
 
@@ -232,6 +281,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Activity className="text-primary" /> Admin Overview
         </h1>
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/95 transition-all shadow-sm shadow-primary/10 cursor-pointer animate-fade-in"
+        >
+          <Plus size={14} /> Add Lead
+        </button>
       </motion.div>
 
       {/* Row 1: KPI Ribbon (6 columns) */}
@@ -636,6 +691,91 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
         </Card>
       </motion.div>
+
+      {/* New Lead Modal */}
+      <Dialog isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Add New Lead">
+        <form onSubmit={handleCreateLead} className="space-y-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Contact Name *</label>
+            <Input 
+              type="text" 
+              value={newLeadName} 
+              onChange={e => setNewLeadName(e.target.value)} 
+              required 
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Company Name</label>
+            <Input 
+              type="text" 
+              value={newLeadCompany} 
+              onChange={e => setNewLeadCompany(e.target.value)} 
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Email</label>
+              <Input 
+                type="email" 
+                value={newLeadEmail} 
+                onChange={e => setNewLeadEmail(e.target.value)} 
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Phone</label>
+              <Input 
+                type="text" 
+                value={newLeadPhone} 
+                onChange={e => setNewLeadPhone(e.target.value)} 
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Deal Value (₹)</label>
+              <Input 
+                type="number" 
+                step="0.01"
+                value={newLeadValue} 
+                onChange={e => setNewLeadValue(e.target.value)} 
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Lead Source</label>
+              <Input 
+                type="text" 
+                value={newLeadSource} 
+                onChange={e => setNewLeadSource(e.target.value)} 
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Assign Agent</label>
+            <select 
+              className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
+              value={newLeadOwner || ''}
+              onChange={e => setNewLeadOwner(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">Unassigned</option>
+              {agents.map(a => (
+                <option key={a.id} value={a.id}>{a.first_name} {a.last_name} ({a.username})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+            <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={createLeadMutation.isPending}>
+              {createLeadMutation.isPending ? 'Creating...' : 'Create Lead'}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
     </motion.div>
   );
 };
