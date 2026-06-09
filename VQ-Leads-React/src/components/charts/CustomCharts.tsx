@@ -339,3 +339,51 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
     </div>
   );
 };
+
+// Bar Chart
+interface BarChartItem {
+  label: string;
+  value: number;
+  color?: string;
+}
+
+interface BarChartProps {
+  data: BarChartItem[];
+}
+
+export const BarChart: React.FC<BarChartProps> = ({ data }) => {
+  if (!data || data.length === 0 || data.every(d => d.value === 0)) {
+    return <div className="text-center text-xs text-muted-foreground py-10">No data available</div>;
+  }
+
+  const maxVal = Math.max(...data.map(d => d.value), 1);
+
+  return (
+    <div className="flex items-end justify-between gap-2 h-[200px] pt-2 px-1">
+      {data.map((item, idx) => {
+        const heightPct = (item.value / maxVal) * 100;
+        const color = item.color || '#3b82f6';
+        return (
+          <div key={idx} className="flex flex-col items-center flex-1 gap-2 min-w-0">
+            <span className="text-[10px] font-bold text-foreground tabular-nums">
+              {item.value >= 1000 ? `${(item.value / 1000).toFixed(0)}k` : item.value}
+            </span>
+            <div className="w-full flex justify-center items-end h-[130px]">
+              <div
+                className="w-full max-w-[36px] rounded-t-lg transition-all duration-500 shadow-lg"
+                style={{
+                  height: `${Math.max(heightPct, 4)}%`,
+                  background: `linear-gradient(180deg, ${color} 0%, ${color}88 100%)`,
+                  boxShadow: `0 4px 14px ${color}33`,
+                }}
+              />
+            </div>
+            <span className="text-[9px] text-muted-foreground font-semibold text-center truncate w-full">
+              {item.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};

@@ -153,9 +153,12 @@ export interface DashboardCharts {
 export interface AgentDashboardData {
   summary: {
     myLeads: number;
-    followups: number;
+    todaysCalls: number;
+    pendingFollowups: number;
     tasksDue: number;
-    commission: number;
+    convertedLeads: number;
+    revenueGenerated: number;
+    commissionEarned: number;
   };
   pipeline: { label: string; count: number }[];
   monthlyPerformance: {
@@ -163,6 +166,11 @@ export interface AgentDashboardData {
     conversions: number;
     revenue: number;
     conversionRate: number;
+  };
+  charts: {
+    activityTimeline: ChartTimelineItem[];
+    pipelineChart: { label: string; value: number; color: string }[];
+    monthlyRevenue: { label: string; value: number }[];
   };
   hotLeads: {
     id: number;

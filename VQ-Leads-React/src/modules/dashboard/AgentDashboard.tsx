@@ -2,6 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api, type User, type AgentDashboardData } from '../../api';
+import { LineChart, DonutChart, BarChart } from '../../components/charts/CustomCharts';
 import { Card } from '../../components/common/Card';
 import {
   Briefcase,
@@ -12,6 +13,11 @@ import {
   Phone,
   AlertTriangle,
   Activity,
+  TrendingUp,
+  PhoneCall,
+  Target,
+  Wallet,
+  Sparkles,
 } from 'lucide-react';
 
 interface AgentDashboardProps {
@@ -23,6 +29,16 @@ const priorityClass = (priority: string) => {
   if (priority === 'Medium') return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
   return 'bg-muted/40 text-muted-foreground border-border/40';
 };
+
+const KPI_CARDS = [
+  { key: 'myLeads' as const, label: 'My Leads', icon: Briefcase, gradient: 'from-blue-500/20 to-blue-600/5', iconColor: 'text-blue-400', border: 'border-blue-500/20' },
+  { key: 'todaysCalls' as const, label: "Today's Calls", icon: PhoneCall, gradient: 'from-violet-500/20 to-violet-600/5', iconColor: 'text-violet-400', border: 'border-violet-500/20' },
+  { key: 'pendingFollowups' as const, label: 'Pending Follow-ups', icon: Calendar, gradient: 'from-cyan-500/20 to-cyan-600/5', iconColor: 'text-cyan-400', border: 'border-cyan-500/20' },
+  { key: 'tasksDue' as const, label: 'Tasks Due', icon: CheckSquare, gradient: 'from-purple-500/20 to-purple-600/5', iconColor: 'text-purple-400', border: 'border-purple-500/20' },
+  { key: 'convertedLeads' as const, label: 'Converted Leads', icon: Target, gradient: 'from-emerald-500/20 to-emerald-600/5', iconColor: 'text-emerald-400', border: 'border-emerald-500/20' },
+  { key: 'revenueGenerated' as const, label: 'Revenue Generated', icon: TrendingUp, gradient: 'from-amber-500/20 to-amber-600/5', iconColor: 'text-amber-400', border: 'border-amber-500/20', isCurrency: true },
+  { key: 'commissionEarned' as const, label: 'Commission Earned', icon: Wallet, gradient: 'from-green-500/20 to-green-600/5', iconColor: 'text-green-400', border: 'border-green-500/20', isCurrency: true },
+];
 
 export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
   const navigate = useNavigate();
@@ -43,73 +59,152 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
     );
   }
 
-  const { summary, pipeline, monthlyPerformance, hotLeads, todaysFollowups, todaysTasks, recentActivities, overdueFollowups } = data;
+  const {
+    summary,
+    monthlyPerformance,
+    charts,
+    hotLeads,
+    todaysFollowups,
+    todaysTasks,
+    recentActivities,
+    overdueFollowups,
+  } = data;
+
+  const donutData = charts.pipelineChart
+    .filter(d => d.value > 0)
+    .map(d => ({ label: d.label, value: d.value, color: d.color }));
+
+  const formatKpiValue = (key: typeof KPI_CARDS[number]['key'], isCurrency?: boolean) => {
+    const val = summary[key];
+    return isCurrency ? formatCurrency(val) : val;
+  };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
-      <div className="text-left">
-        <h1 className="text-xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Welcome back, {user.first_name || user.full_name}</p>
+    <div className="p-6 md:p-8 space-y-6 max-w-[1400px] mx-auto">
+      {/* Hero header */}
+      <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 via-card to-card p-6 md:p-8 text-left">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles size={18} className="text-primary" />
+              <span className="text-xs font-bold text-primary uppercase tracking-widest">Agent Workspace</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              Welcome back, {user.first_name || user.full_name}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {monthlyPerformance.conversionRate}% conversion rate this month · {monthlyPerformance.callsMade} calls made
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate('/leads?filter=available')}
+              className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+            >
+              Claim Leads
+            </button>
+            <button
+              onClick={() => navigate('/leads?filter=my')}
+              className="px-4 py-2.5 rounded-xl bg-card border border-border text-foreground text-sm font-bold hover:bg-muted/40 transition-all"
+            >
+              My Pipeline
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'My Leads', value: summary.myLeads, icon: Briefcase, color: 'text-primary bg-primary/10 border-primary/20' },
-          { label: 'Follow-ups', value: summary.followups, icon: Calendar, color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
-          { label: 'Tasks Due', value: summary.tasksDue, icon: CheckSquare, color: 'text-purple-400 bg-purple-500/10 border-purple-500/20' },
-          { label: 'Commission', value: formatCurrency(summary.commission), icon: DollarSign, color: 'text-green-400 bg-green-500/10 border-green-500/20' },
-        ].map(item => {
-          const Icon = item.icon;
+      {/* 7 KPI cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+        {KPI_CARDS.map(card => {
+          const Icon = card.icon;
           return (
-            <Card key={item.label} className="p-5 flex items-center justify-between">
-              <div className="text-left">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{item.label}</p>
-                <p className="text-2xl font-bold text-foreground mt-1">{item.value}</p>
+            <Card
+              key={card.key}
+              className={`p-4 bg-gradient-to-br ${card.gradient} border ${card.border} hover:scale-[1.02] transition-transform cursor-default`}
+            >
+              <div className={`h-9 w-9 rounded-lg bg-card/60 border ${card.border} flex items-center justify-center mb-3`}>
+                <Icon size={18} className={card.iconColor} />
               </div>
-              <div className={`h-11 w-11 rounded-xl border flex items-center justify-center ${item.color}`}>
-                <Icon size={20} />
-              </div>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider leading-tight">
+                {card.label}
+              </p>
+              <p className="text-xl font-bold text-foreground mt-1 tabular-nums">
+                {formatKpiValue(card.key, card.isCurrency)}
+              </p>
             </Card>
           );
         })}
       </div>
 
-      {/* Pipeline + Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="p-5 text-left">
-          <h3 className="text-sm font-bold text-foreground mb-4">Lead Pipeline</h3>
-          <div className="space-y-2.5">
-            {pipeline.map(stage => (
-              <div key={stage.label} className="flex items-center justify-between py-1.5 border-b border-border/30 last:border-0">
-                <span className="text-sm text-muted-foreground">{stage.label}</span>
-                <span className="text-sm font-bold text-foreground tabular-nums">{stage.count}</span>
-              </div>
-            ))}
+      {/* Charts row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2 p-5 text-left">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-foreground">Activity Overview</h3>
+              <p className="text-xs text-muted-foreground">Calls vs conversions — last 14 days</p>
+            </div>
+            <div className="flex gap-4 text-[10px] font-semibold">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Calls
+              </span>
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Conversions
+              </span>
+            </div>
           </div>
+          <LineChart data={charts.activityTimeline} />
         </Card>
 
         <Card className="p-5 text-left">
-          <h3 className="text-sm font-bold text-foreground mb-4">Monthly Performance</h3>
-          <div className="space-y-2.5">
+          <h3 className="text-sm font-bold text-foreground mb-1">Pipeline Breakdown</h3>
+          <p className="text-xs text-muted-foreground mb-2">Lead status distribution</p>
+          <DonutChart data={donutData.length > 0 ? donutData : [{ label: 'No leads', value: 1, color: '#334155' }]} />
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="p-5 text-left">
+          <h3 className="text-sm font-bold text-foreground mb-1">Monthly Revenue</h3>
+          <p className="text-xs text-muted-foreground mb-4">Won deals revenue trend</p>
+          <BarChart
+            data={charts.monthlyRevenue.map((item, i) => ({
+              ...item,
+              color: ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'][i % 6],
+            }))}
+          />
+        </Card>
+
+        <Card className="p-5 text-left">
+          <h3 className="text-sm font-bold text-foreground mb-4">This Month at a Glance</h3>
+          <div className="grid grid-cols-2 gap-3">
             {[
-              { label: 'Calls Made', value: monthlyPerformance.callsMade },
-              { label: 'Conversions', value: monthlyPerformance.conversions },
-              { label: 'Revenue', value: formatCurrency(monthlyPerformance.revenue) },
-              { label: 'Conversion %', value: `${monthlyPerformance.conversionRate}%` },
-            ].map(row => (
-              <div key={row.label} className="flex items-center justify-between py-1.5 border-b border-border/30 last:border-0">
-                <span className="text-sm text-muted-foreground">{row.label}</span>
-                <span className="text-sm font-bold text-foreground">{row.value}</span>
-              </div>
-            ))}
+              { label: 'Calls Made', value: monthlyPerformance.callsMade, icon: Phone, color: 'text-violet-400 bg-violet-500/10' },
+              { label: 'Conversions', value: monthlyPerformance.conversions, icon: Target, color: 'text-emerald-400 bg-emerald-500/10' },
+              { label: 'Revenue', value: formatCurrency(monthlyPerformance.revenue), icon: DollarSign, color: 'text-amber-400 bg-amber-500/10' },
+              { label: 'Conversion Rate', value: `${monthlyPerformance.conversionRate}%`, icon: TrendingUp, color: 'text-blue-400 bg-blue-500/10' },
+            ].map(item => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="p-4 rounded-xl border border-border/40 bg-muted/10 flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${item.color}`}>
+                    <Icon size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground font-semibold uppercase">{item.label}</p>
+                    <p className="text-lg font-bold text-foreground">{item.value}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       </div>
 
       {/* Hot Leads */}
       <Card className="overflow-hidden text-left">
-        <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2">
+        <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2 bg-gradient-to-r from-orange-500/10 to-transparent">
           <Flame size={16} className="text-orange-400" />
           <h3 className="text-sm font-bold text-foreground">Hot Leads</h3>
         </div>
@@ -150,7 +245,6 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Today's Follow-ups */}
         <Card className="text-left">
           <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2">
             <Calendar size={16} className="text-blue-400" />
@@ -173,7 +267,6 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
           </div>
         </Card>
 
-        {/* Today's Tasks */}
         <Card className="text-left">
           <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2">
             <CheckSquare size={16} className="text-green-400" />
@@ -197,7 +290,6 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Recent Activities */}
         <Card className="text-left">
           <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2">
             <Activity size={16} className="text-primary" />
@@ -220,9 +312,8 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
           </div>
         </Card>
 
-        {/* Overdue Follow-ups */}
-        <Card className="text-left">
-          <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2">
+        <Card className="text-left border-red-500/20">
+          <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2 bg-gradient-to-r from-red-500/10 to-transparent">
             <AlertTriangle size={16} className="text-red-400" />
             <h3 className="text-sm font-bold text-foreground">
               Overdue Follow-ups {overdueFollowups.length > 0 && `(${overdueFollowups.length})`}

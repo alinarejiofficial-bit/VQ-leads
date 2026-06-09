@@ -769,9 +769,12 @@ class AgentDashboardView(APIView):
         return Response({
             'summary': {
                 'myLeads': total_leads,
-                'followups': pending_followups,
+                'todaysCalls': todays_calls,
+                'pendingFollowups': pending_followups,
                 'tasksDue': tasks_due,
-                'commission': float(earned_commissions),
+                'convertedLeads': converted_leads,
+                'revenueGenerated': float(revenue_generated),
+                'commissionEarned': float(earned_commissions),
             },
             'pipeline': pipeline,
             'monthlyPerformance': {
@@ -779,6 +782,11 @@ class AgentDashboardView(APIView):
                 'conversions': month_conversions,
                 'revenue': float(month_revenue),
                 'conversionRate': conversion_pct,
+            },
+            'charts': {
+                'activityTimeline': activity_timeline,
+                'pipelineChart': pipeline_chart,
+                'monthlyRevenue': monthly_revenue,
             },
             'hotLeads': hot_leads,
             'todaysFollowups': todays_followups,
