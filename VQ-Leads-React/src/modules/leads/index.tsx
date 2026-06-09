@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
 import { api, type User, type Lead } from '../../api';
 import { Button } from '../../components/forms/Button';
 import { Card } from '../../components/common/Card';
@@ -8,36 +7,19 @@ import { Input } from '../../components/forms/Input';
 import { Dialog } from '../../components/common/Dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/datatable/Table';
 import { LeadDetailsDrawer } from './components/LeadDetailsDrawer';
-import { Plus, Search, Download } from 'lucide-react';
-
-// Mapping of lead status to Tailwind color classes
-const statusColors: Record<string, { bg: string; border: string; text: string }> = {
-  NEW: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400' },
-  AVAILABLE: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400' },
-  CLAIMED: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400' },
-  CONTACTED: { bg: 'bg-orange-500/10', border: 'border-orange-500/20', text: 'text-orange-400' },
-  QUALIFIED: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-400' },
-  FOLLOW_UP: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', text: 'text-yellow-400' },
-  PROPOSAL_SENT: { bg: 'bg-teal-500/10', border: 'border-teal-500/20', text: 'text-teal-400' },
-  NEGOTIATION: { bg: 'bg-pink-500/10', border: 'border-pink-500/20', text: 'text-pink-400' },
-  CONVERTED: { bg: 'bg-green-500/10', border: 'border-green-500/20', text: 'text-green-400' },
-  LOST: { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' },
-  DUPLICATE: { bg: 'bg-gray-500/10', border: 'border-gray-500/20', text: 'text-gray-400' },
-  INVALID: { bg: 'bg-gray-800/10', border: 'border-gray-800/20', text: 'text-gray-300' },
-};
+import { Plus, Search } from 'lucide-react';
 
 interface LeadsProps {
   user: User;
 }
 
 export const Leads: React.FC<LeadsProps> = ({ user }) => {
-  const location = useLocation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
 
@@ -51,39 +33,17 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const [newLeadOwner, setNewLeadOwner] = useState<number | null>(null);
 
   const isAdmin = user.profile.role === 'ADMIN';
-  const isLeaderOrAdmin = isAdmin || user.profile.role === 'LEADER';
 
-  // Apply URL filters
-  React.useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const filter = params.get('filter');
-    // reset all filters first
-    setStatusFilter('');
-    setOwnerFilter('');
-
-    if (filter) {
-      if (filter === 'my') {
-        setOwnerFilter(String(user.id));
-      } else {
-        const validStatuses = ['NEW', 'AVAILABLE', 'CLAIMED', 'CONTACTED', 'QUALIFIED', 'FOLLOW_UP', 'PROPOSAL_SENT', 'NEGOTIATION', 'CONVERTED', 'LOST', 'DUPLICATE', 'INVALID'];
-        const formattedFilter = filter.toUpperCase();
-        if (validStatuses.includes(formattedFilter)) {
-          setStatusFilter(formattedFilter);
-        }
-      }
-    }
-  }, [location.search, user]);
+  // React Query fetch
   const { data: leads = [], refetch: refetchLeads } = useQuery<Lead[]>({
     queryKey: ['leads'],
     queryFn: api.getLeads,
   });
 
-
-
   const { data: agents = [] } = useQuery<User[]>({
     queryKey: ['agents'],
     queryFn: api.getAgents,
-    enabled: isLeaderOrAdmin
+    enabled: isAdmin
   });
 
   // Mutations
@@ -134,101 +94,59 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   };
 
   const filteredLeads = leads.filter(l => {
-    const matchesSearch = l.name.toLowerCase().includes(search.toLowerCase()) || 
-                          l.company.toLowerCase().includes(search.toLowerCase()) ||
-                          l.email.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = l.name.toLowerCase().includes(search.toLowerCase()) ||
+      l.company.toLowerCase().includes(search.toLowerCase()) ||
+      l.email.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = !statusFilter || l.status === statusFilter;
     const matchesSource = !sourceFilter || l.source === sourceFilter;
-    const matchesOwner = !ownerFilter || 
-                         (ownerFilter === 'unassigned' && !l.owner) || 
-                         (l.owner && l.owner.toString() === ownerFilter);
+    const matchesOwner = !ownerFilter ||
+      (ownerFilter === 'unassigned' && !l.owner) ||
+      (l.owner && l.owner.toString() === ownerFilter);
     return matchesSearch && matchesStatus && matchesSource && matchesOwner;
   });
-
-  const handleExportCSV = () => {
-    if (filteredLeads.length === 0) {
-      alert("No leads to export.");
-      return;
-    }
-    const headers = ["ID", "Name", "Company", "Email", "Phone", "Status", "Source", "Value ($)", "Owner", "Created Date"];
-    const rows = filteredLeads.map(l => [
-      l.id,
-      `"${l.name.replace(/"/g, '""')}"`,
-      `"${(l.company || '').replace(/"/g, '""')}"`,
-      `"${l.email || ''}"`,
-      `"${l.phone || ''}"`,
-      l.status,
-      `"${l.source.replace(/"/g, '""')}"`,
-      l.value,
-      `"${(l.owner_name || 'Unassigned').replace(/"/g, '""')}"`,
-      new Date(l.created_at).toLocaleDateString()
-    ]);
-    const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `vq_leads_export_${new Date().toISOString().slice(0,10)}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   const sources = Array.from(new Set(leads.map(l => l.source)));
 
   const kanbanColumns = [
     { id: 'NEW', title: 'New', color: 'bg-blue-500' },
-    { id: 'AVAILABLE', title: 'Available', color: 'bg-cyan-500' },
-    { id: 'CLAIMED', title: 'Claimed', color: 'bg-purple-500' },
-    { id: 'CONTACTED', title: 'Contacted', color: 'bg-orange-500' },
-    { id: 'QUALIFIED', title: 'Qualified', color: 'bg-indigo-500' },
-    { id: 'FOLLOW_UP', title: 'Follow‑up', color: 'bg-yellow-500' },
-    { id: 'PROPOSAL_SENT', title: 'Proposal Sent', color: 'bg-teal-500' },
-    { id: 'NEGOTIATION', title: 'Negotiation', color: 'bg-pink-500' },
-    { id: 'CONVERTED', title: 'Converted', color: 'bg-green-500' },
-    { id: 'LOST', title: 'Lost', color: 'bg-red-500' },
-    { id: 'DUPLICATE', title: 'Duplicate', color: 'bg-gray-500' },
-    { id: 'INVALID', title: 'Invalid', color: 'bg-gray-800' },
+    { id: 'CONTACTED', title: 'Contacted', color: 'bg-purple-500' },
+    { id: 'IN_PROGRESS', title: 'In Progress', color: 'bg-amber-500' },
+    { id: 'QUALIFIED', title: 'Qualified', color: 'bg-primary' },
+    { id: 'WON', title: 'Won', color: 'bg-green-500' },
+    { id: 'LOST', title: 'Lost', color: 'bg-red-500' }
   ];
 
   return (
-    <div className="p-8 space-y-6 animate-fade-in">
+    <div className="p-8 space-y-6">
       {/* Header Filters & View Switching */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search size={15} className="absolute left-3 top-3 text-muted-foreground" />
-            <Input 
-              type="text" 
-              placeholder="Search leads..." 
+            <Input
+              type="text"
+              placeholder="Search leads..."
               className="pl-9 w-[240px]"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
 
-          <select 
+          <select
             className="flex h-10 rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
           >
             <option value="">All Statuses</option>
             <option value="NEW">New</option>
-            <option value="AVAILABLE">Available</option>
-            <option value="CLAIMED">Claimed</option>
             <option value="CONTACTED">Contacted</option>
+            <option value="IN_PROGRESS">In Progress</option>
             <option value="QUALIFIED">Qualified</option>
-            <option value="FOLLOW_UP">Follow-up</option>
-            <option value="PROPOSAL_SENT">Proposal Sent</option>
-            <option value="NEGOTIATION">Negotiation</option>
-            <option value="CONVERTED">Converted</option>
+            <option value="WON">Won</option>
             <option value="LOST">Lost</option>
-            <option value="DUPLICATE">Duplicate</option>
-            <option value="INVALID">Invalid</option>
           </select>
 
-          <select 
+          <select
             className="flex h-10 rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
             value={sourceFilter}
             onChange={e => setSourceFilter(e.target.value)}
@@ -237,8 +155,8 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             {sources.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
 
-          {isLeaderOrAdmin && (
-            <select 
+          {isAdmin && (
+            <select
               className="flex h-10 rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
               value={ownerFilter}
               onChange={e => setOwnerFilter(e.target.value)}
@@ -253,13 +171,13 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
         <div className="flex items-center gap-3 self-end md:self-auto">
           {/* Switch view */}
           <div className="inline-flex items-center justify-center rounded-lg bg-muted/40 p-1 border border-border/40 text-xs">
-            <button 
+            <button
               className={`px-3 py-1.5 rounded-md font-semibold transition-all ${viewMode === 'list' ? 'bg-secondary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => setViewMode('list')}
             >
               List
             </button>
-            <button 
+            <button
               className={`px-3 py-1.5 rounded-md font-semibold transition-all ${viewMode === 'kanban' ? 'bg-secondary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => setViewMode('kanban')}
             >
@@ -267,18 +185,11 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             </button>
           </div>
 
-          {isAdmin && (
-            <Button variant="outline" onClick={handleExportCSV}>
-              <Download size={16} className="mr-1.5" /> Export CSV
-            </Button>
-          )}
-
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus size={16} className="mr-1.5" /> New Lead
           </Button>
         </div>
       </div>
-
 
       {/* Grid or List render */}
       {viewMode === 'list' ? (
@@ -287,8 +198,6 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             <TableHeader>
               <TableRow className="hover:bg-transparent cursor-default">
                 <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Value</TableHead>
@@ -300,50 +209,26 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             <TableBody>
               {filteredLeads.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
                     No leads match your criteria.
                   </TableCell>
                 </TableRow>
               ) : (
-                  filteredLeads.map((l, idx) => (
-                  <TableRow
-                    key={l.id}
-                    className="cursor-pointer hover:bg-muted/30 transition-colors animate-fade-in-up"
-                    style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'both' }}
-                    onClick={() => setSelectedLeadId(l.id)}
-                  >
-                    <TableCell className="font-semibold text-foreground">
-                      <div>{l.name}</div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5">Click to view details →</div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{l.email || '-'}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{l.phone || '-'}</TableCell>
+                filteredLeads.map(l => (
+                  <TableRow key={l.id} onClick={() => setSelectedLeadId(l.id)}>
+                    <TableCell className="font-semibold text-foreground">{l.name}</TableCell>
                     <TableCell>{l.company || '-'}</TableCell>
                     <TableCell>{l.source}</TableCell>
                     <TableCell className="font-semibold">${l.value}</TableCell>
+                    <TableCell>{l.owner_name}</TableCell>
                     <TableCell>
-                      {l.owner_name ? l.owner_name : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground text-xs italic">Unassigned</span>
-                          {!isLeaderOrAdmin && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateLeadMutation.mutate({ id: l.id, data: { owner: user.id, status: 'CLAIMED' } });
-                              }}
-                              className="px-2 py-0.5 bg-primary/20 text-primary text-[10px] font-bold rounded hover:bg-primary/30 transition-colors"
-                            >
-                              Claim
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${(() => {
-                        const colors = statusColors[l.status];
-                        return colors ? `${colors.bg} ${colors.border} ${colors.text}` : 'bg-gray-500/10 border-gray-500/20 text-gray-400';
-                      })()}`}>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${l.status === 'NEW' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
+                          l.status === 'CONTACTED' ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' :
+                            l.status === 'IN_PROGRESS' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+                              l.status === 'QUALIFIED' ? 'bg-primary/10 border-primary/20 text-primary-foreground' :
+                                l.status === 'WON' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
+                                  'bg-red-500/10 border-red-500/20 text-red-400'
+                        }`}>
                         {l.status}
                       </span>
                     </TableCell>
@@ -359,7 +244,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
           {kanbanColumns.map(col => {
             const colLeads = filteredLeads.filter(l => l.status === col.id);
             return (
-              <div key={col.id} className="flex-1 min-w-[280px] max-w-[340px] bg-card/40 border border-border/80 rounded-xl p-4 flex flex-col max-h-[calc(100vh-190px)] shrink-0 animate-fade-in">
+              <div key={col.id} className="flex-1 min-w-[280px] max-w-[340px] bg-card/40 border border-border/80 rounded-xl p-4 flex flex-col max-h-[calc(100vh-190px)] shrink-0">
                 <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-2">
                   <div className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full ${col.color}`} />
@@ -371,40 +256,21 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                 </div>
 
                 <div className="flex flex-col gap-3 overflow-y-auto pr-1">
-                  {colLeads.map((l, idx) => (
-                    <div 
-                      key={l.id} 
-                      className="bg-card border border-border/80 rounded-lg p-4 cursor-pointer hover:border-border/100 hover:shadow-lg transition-all text-left animate-fade-in-up"
-                      style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'both' }}
+                  {colLeads.map(l => (
+                    <div
+                      key={l.id}
+                      className="bg-card border border-border/80 rounded-lg p-4 cursor-pointer hover:border-border/100 hover:shadow-lg transition-all text-left"
                       onClick={() => setSelectedLeadId(l.id)}
                     >
                       <h5 className="text-sm font-semibold text-foreground leading-snug">{l.name}</h5>
                       <p className="text-xs text-muted-foreground mt-1 mb-3">{l.company || 'No Company'}</p>
-                      
+
                       <div className="flex justify-between items-center text-xs mt-2 pt-2.5 border-t border-border/40">
                         <span className="font-semibold text-foreground">${l.value}</span>
-                        {l.owner_name ? (
-                          <span className="text-[10px] bg-muted/40 border border-border/40 px-1.5 py-0.5 rounded text-muted-foreground max-w-[100px] truncate">
-                            {l.owner_name}
-                          </span>
-                        ) : !isLeaderOrAdmin ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateLeadMutation.mutate({ id: l.id, data: { owner: user.id, status: 'CLAIMED' } });
-                            }}
-                            className="px-2 py-0.5 bg-primary/20 text-primary text-[10px] font-bold rounded hover:bg-primary/30 transition-colors"
-                          >
-                            Claim
-                          </button>
-                        ) : (
-                          <span className="text-[10px] bg-muted/40 border border-border/40 px-1.5 py-0.5 rounded text-muted-foreground italic">
-                            Unassigned
-                          </span>
-                        )}
+                        <span className="text-[10px] bg-muted/40 border border-border/40 px-1.5 py-0.5 rounded text-muted-foreground max-w-[100px] truncate">
+                          {l.owner_name}
+                        </span>
                       </div>
-
-
 
                       {/* Manual board transition triggers */}
                       <div className="flex gap-1.5 mt-3 pt-2 border-t border-border/40 overflow-x-auto justify-end">
@@ -438,38 +304,38 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
         <form onSubmit={handleCreateLead} className="space-y-4">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-foreground">Contact Name *</label>
-            <Input 
-              type="text" 
-              value={newLeadName} 
-              onChange={e => setNewLeadName(e.target.value)} 
-              required 
+            <Input
+              type="text"
+              value={newLeadName}
+              onChange={e => setNewLeadName(e.target.value)}
+              required
             />
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-foreground">Company Name</label>
-            <Input 
-              type="text" 
-              value={newLeadCompany} 
-              onChange={e => setNewLeadCompany(e.target.value)} 
+            <Input
+              type="text"
+              value={newLeadCompany}
+              onChange={e => setNewLeadCompany(e.target.value)}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Email</label>
-              <Input 
-                type="email" 
-                value={newLeadEmail} 
-                onChange={e => setNewLeadEmail(e.target.value)} 
+              <Input
+                type="email"
+                value={newLeadEmail}
+                onChange={e => setNewLeadEmail(e.target.value)}
               />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Phone</label>
-              <Input 
-                type="text" 
-                value={newLeadPhone} 
-                onChange={e => setNewLeadPhone(e.target.value)} 
+              <Input
+                type="text"
+                value={newLeadPhone}
+                onChange={e => setNewLeadPhone(e.target.value)}
               />
             </div>
           </div>
@@ -477,28 +343,28 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Deal Value ($)</label>
-              <Input 
-                type="number" 
+              <Input
+                type="number"
                 step="0.01"
-                value={newLeadValue} 
-                onChange={e => setNewLeadValue(e.target.value)} 
+                value={newLeadValue}
+                onChange={e => setNewLeadValue(e.target.value)}
               />
             </div>
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Lead Source</label>
-              <Input 
-                type="text" 
-                value={newLeadSource} 
-                onChange={e => setNewLeadSource(e.target.value)} 
+              <Input
+                type="text"
+                value={newLeadSource}
+                onChange={e => setNewLeadSource(e.target.value)}
               />
             </div>
           </div>
 
-          {isLeaderOrAdmin && (
+          {isAdmin && (
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Assign Agent</label>
-              <select 
+              <select
                 className="flex h-10 w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
                 value={newLeadOwner || ''}
                 onChange={e => setNewLeadOwner(e.target.value ? Number(e.target.value) : null)}

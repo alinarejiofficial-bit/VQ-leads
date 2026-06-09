@@ -85,7 +85,6 @@ class FollowUpSerializer(serializers.ModelSerializer):
     class Meta:
         model = FollowUp
         fields = ['id', 'lead', 'lead_name', 'scheduled_time', 'notes', 'completed', 'created_by', 'created_by_name', 'created_at']
-        read_only_fields = ['created_by']
 
     def get_created_by_name(self, obj):
         name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()

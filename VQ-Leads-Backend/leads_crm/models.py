@@ -8,7 +8,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(
         max_length=10,
-        choices=[('ADMIN', 'Admin'), ('LEADER', 'Team Leader'), ('AGENT', 'Agent')],
+        choices=[('ADMIN', 'Admin'), ('AGENT', 'Agent')],
         default='AGENT'
     )
     commission_rate = models.DecimalField(
@@ -73,18 +73,11 @@ class LeadForm(models.Model):
 class Lead(models.Model):
     STATUS_CHOICES = [
         ('NEW', 'New'),
-        ('AVAILABLE', 'Available'),
-        ('CLAIMED', 'Claimed'),
         ('CONTACTED', 'Contacted'),
         ('IN_PROGRESS', 'In Progress'),
         ('QUALIFIED', 'Qualified'),
-        ('FOLLOW_UP', 'Follow-up'),
-        ('PROPOSAL_SENT', 'Proposal Sent'),
-        ('NEGOTIATION', 'Negotiation'),
-        ('WON', 'Won'),
         ('LOST', 'Lost'),
-        ('DUPLICATE', 'Duplicate'),
-        ('INVALID', 'Invalid'),
+        ('WON', 'Won'),
     ]
 
     name = models.CharField(max_length=150)
