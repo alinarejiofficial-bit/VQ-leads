@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
-import { api, type User, type DashboardStats, type DashboardCharts } from '../../api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api, type User, type Lead, type FollowUp, type Commission, type DashboardStats, type DashboardCharts } from '../../api';
 import { LineChart, DonutChart } from '../../components/charts/CustomCharts';
 import { Card } from '../../components/common/Card';
 import { AgentDashboard } from './AgentDashboard';
@@ -26,61 +26,16 @@ interface DashboardProps {
   user: User;
 }
 
-const DEMO_DATA = {
-  activeAgents: 24,
-  followUpsDue: 32,
-  commPending: 48000,
-  salesFunnel: [
-    { label: 'New', count: 1248, color: 'bg-blue-500' },
-    { label: 'Claimed', count: 950, color: 'bg-indigo-500' },
-    { label: 'Contacted', count: 720, color: 'bg-violet-500' },
-    { label: 'Qualified', count: 430, color: 'bg-fuchsia-500' },
-    { label: 'Negotiation', count: 180, color: 'bg-pink-500' },
-    { label: 'Converted', count: 125, color: 'bg-emerald-500' },
-  ],
-  followUpCenter: {
-    dueToday: 24,
-    overdue: 8,
-    upcoming: 31
-  },
-  recentActivities: [
-    { text: 'Lead #124 claimed by Sarah', time: '2 min ago', type: 'claim', icon: UserPlus, color: 'text-blue-500 bg-blue-500/10' },
-    { text: 'Follow-up created by John', time: '5 min ago', type: 'followup', icon: Calendar, color: 'text-orange-500 bg-orange-500/10' },
-    { text: 'Lead #532 converted', time: '8 min ago', type: 'convert', icon: Check, color: 'text-emerald-500 bg-emerald-500/10' },
-    { text: 'Commission approved', time: '12 min ago', type: 'commission', icon: IndianRupee, color: 'text-violet-500 bg-violet-500/10' },
-    { text: 'New lead imported', time: '20 min ago', type: 'import', icon: Download, color: 'text-cyan-500 bg-cyan-500/10' }
-  ],
-  recentLeads: [
-    { name: 'Raj Kumar', source: 'Google Ads', status: 'Qualified', owner: 'Sarah', value: 50000 },
-    { name: 'Anil George', source: 'Website Forms', status: 'Contacted', owner: 'John', value: 30000 },
-    { name: 'Priya Menon', source: 'Facebook Ads', status: 'New', owner: 'Unassigned', value: 15000 },
-    { name: 'Vikram Singh', source: 'WhatsApp', status: 'Negotiation', owner: 'Michael', value: 75000 },
-    { name: 'Neha Sharma', source: 'Google Ads', status: 'Claimed', owner: 'Sarah', value: 25000 },
-  ]
-};
-
 export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   // Route agents to their dedicated dashboard
   if (user.profile.role === 'AGENT') {
     return <AgentDashboard user={user} />;
   }
 
+  const queryClient = useQueryClient();
   const [revenueTimeframe, setRevenueTimeframe] = useState<'1D' | '1W' | '1M' | '6M' | '1Y'>('1Y');
-  const [recentLeads, setRecentLeads] = useState(DEMO_DATA.recentLeads);
 
-  const handleClaimLead = (idx: number) => {
-    const newLeads = [...recentLeads];
-    newLeads[idx].owner = user.first_name || user.username || 'You';
-    newLeads[idx].status = 'Claimed';
-    setRecentLeads(newLeads);
-  };
-
-  const handleUpdateStatus = (idx: number, e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newLeads = [...recentLeads];
-    newLeads[idx].status = e.target.value;
-    setRecentLeads(newLeads);
-  };
-
+  // Fetch real data
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: api.getDashboardStats,
@@ -91,7 +46,55 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     queryFn: api.getDashboardCharts,
   });
 
-  if (statsLoading || chartsLoading) {
+  const { data: leads = [], isLoading: leadsLoading } = useQuery<Lead[]>({
+    queryKey: ['leads'],
+    queryFn: api.getLeads,
+  });
+
+  const { data: agents = [], isLoading: agentsLoading } = useQuery<User[]>({
+    queryKey: ['agents'],
+    queryFn: api.getAgents,
+  });
+
+  const { data: commissions = [], isLoading: commissionsLoading } = useQuery<Commission[]>({
+    queryKey: ['commissions'],
+    queryFn: api.getCommissions,
+  });
+
+  const { data: followups = [], isLoading: followupsLoading } = useQuery<FollowUp[]>({
+    queryKey: ['followups'],
+    queryFn: api.getFollowUps,
+  });
+
+  // Mutations
+  const updateLeadMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<Lead> }) => api.updateLead(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-charts'] });
+      queryClient.invalidateQueries({ queryKey: ['followups'] });
+      queryClient.invalidateQueries({ queryKey: ['commissions'] });
+    },
+  });
+
+  const handleClaimLead = (leadId: number) => {
+    updateLeadMutation.mutate({
+      id: leadId,
+      data: { owner: user.id, status: 'CLAIMED' as any }
+    });
+  };
+
+  const handleUpdateStatus = (leadId: number, e: React.ChangeEvent<HTMLSelectElement>) => {
+    updateLeadMutation.mutate({
+      id: leadId,
+      data: { status: e.target.value as any }
+    });
+  };
+
+  const isAllLoading = statsLoading || chartsLoading || leadsLoading || agentsLoading || commissionsLoading || followupsLoading;
+
+  if (isAllLoading) {
     return (
       <div className="p-8 flex items-center justify-center h-[calc(100vh-70px)]">
         <div className="text-muted-foreground text-sm font-semibold animate-pulse">Loading dashboard metrics...</div>
@@ -106,11 +109,79 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     return `₹${val}`;
   };
 
+  const getStatusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      NEW: 'New',
+      AVAILABLE: 'Available',
+      CLAIMED: 'Claimed',
+      CONTACTED: 'Contacted',
+      IN_PROGRESS: 'In Progress',
+      QUALIFIED: 'Qualified',
+      FOLLOW_UP: 'Follow-up',
+      PROPOSAL_SENT: 'Proposal',
+      NEGOTIATION: 'Negotiation',
+      CONVERTED: 'Converted',
+      WON: 'Converted',
+      LOST: 'Lost',
+    };
+    return map[status] || status;
+  };
+
   // KPI Calculations
   const totalLeads = stats?.totalLeads || 0;
   const convertedLeads = stats?.convertedLeads || 0;
   const pipelineValue = stats?.pipelineValue || 0;
   const winRate = totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0;
+
+  const activeAgentsCount = agents.length;
+  const followupsDueCount = stats?.followupsDue || 0;
+  const commPendingSum = commissions
+    .filter(c => c.status === 'PENDING')
+    .reduce((sum, c) => sum + parseFloat(c.amount || '0'), 0);
+
+  // Sales Funnel
+  const salesFunnelData = [
+    { label: 'New', count: stats?.statusBreakdown?.NEW || 0, color: 'bg-blue-500' },
+    { label: 'Claimed', count: stats?.statusBreakdown?.CLAIMED || 0, color: 'bg-indigo-500' },
+    { label: 'Contacted', count: stats?.statusBreakdown?.CONTACTED || 0, color: 'bg-violet-500' },
+    { label: 'Qualified', count: stats?.statusBreakdown?.QUALIFIED || 0, color: 'bg-fuchsia-500' },
+    { label: 'Negotiation', count: stats?.statusBreakdown?.NEGOTIATION || 0, color: 'bg-pink-500' },
+    { label: 'Converted', count: (stats?.statusBreakdown?.WON || 0) + (stats?.statusBreakdown?.CONVERTED || 0), color: 'bg-emerald-500' },
+  ];
+
+  // Follow-up Center
+  const today = new Date().toDateString();
+  const nowTime = new Date();
+
+  const dueTodayCount = followups.filter(f => !f.completed && new Date(f.scheduled_time).toDateString() === today).length;
+  const overdueCount = followups.filter(f => !f.completed && new Date(f.scheduled_time) < nowTime && new Date(f.scheduled_time).toDateString() !== today).length;
+  const upcomingCount = followups.filter(f => !f.completed && new Date(f.scheduled_time) > nowTime && new Date(f.scheduled_time).toDateString() !== today).length;
+
+  // Recent Activities dynamically generated from recent leads activity
+  const formatTimeAgo = (dateStr: string) => {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hr ago`;
+    return `${Math.floor(diffHours / 24)} days ago`;
+  };
+
+  const recentActivities = leads.slice(0, 5).map(lead => {
+    const timeStr = formatTimeAgo(lead.updated_at);
+    if (lead.status === 'NEW') {
+      return { text: `New lead "${lead.name}" added to database`, time: timeStr, type: 'import', icon: Download, color: 'text-cyan-500 bg-cyan-500/10' };
+    } else if (lead.status === 'CLAIMED') {
+      return { text: `Lead "${lead.name}" claimed by ${lead.owner_name}`, time: timeStr, type: 'claim', icon: UserPlus, color: 'text-blue-500 bg-blue-500/10' };
+    } else if (['WON', 'CONVERTED'].includes(lead.status)) {
+      return { text: `Lead "${lead.name}" successfully converted`, time: timeStr, type: 'convert', icon: Check, color: 'text-emerald-500 bg-emerald-500/10' };
+    } else {
+      return { text: `Lead "${lead.name}" status updated to ${getStatusLabel(lead.status)}`, time: timeStr, type: 'update', icon: Activity, color: 'text-orange-500 bg-orange-500/10' };
+    }
+  });
+
+  const recentLeadsList = leads.slice(0, 5);
 
   // Construct source donut chart data
   const colors = ['#3b82f6', '#f97316', '#eab308', '#06b6d4', '#a855f7', '#10b981', '#6366f1'];
@@ -161,9 +232,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Activity className="text-primary" /> Admin Overview
         </h1>
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold px-2 py-1 bg-primary/10 text-primary rounded-md border border-primary/20">Live Demo</span>
-        </div>
       </motion.div>
 
       {/* Row 1: KPI Ribbon (6 columns) */}
@@ -204,7 +272,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         <motion.div variants={itemVariants}>
           <Card className="p-5 border border-border/50 shadow-sm bg-gradient-to-br from-cyan-500/5 to-transparent flex flex-col justify-center text-left relative overflow-hidden group h-full hover:border-cyan-500/30 transition-colors">
             <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider mb-1">Active Agents</span>
-            <h3 className="text-2xl font-black text-foreground">{DEMO_DATA.activeAgents}</h3>
+            <h3 className="text-2xl font-black text-foreground">{activeAgentsCount}</h3>
             <div className="absolute top-4 right-4 text-cyan-500/20 group-hover:text-cyan-500/40 transition-colors"><Briefcase size={24} /></div>
           </Card>
         </motion.div>
@@ -213,7 +281,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         <motion.div variants={itemVariants}>
           <Card className="p-5 border border-border/50 shadow-sm bg-gradient-to-br from-orange-500/5 to-transparent flex flex-col justify-center text-left relative overflow-hidden group h-full hover:border-orange-500/30 transition-colors">
             <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider mb-1">Follow Ups Due</span>
-            <h3 className="text-2xl font-black text-foreground">{DEMO_DATA.followUpsDue}</h3>
+            <h3 className="text-2xl font-black text-foreground">{followupsDueCount}</h3>
             <div className="absolute top-4 right-4 text-orange-500/20 group-hover:text-orange-500/40 transition-colors"><Clock size={24} /></div>
           </Card>
         </motion.div>
@@ -222,7 +290,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         <motion.div variants={itemVariants}>
           <Card className="p-5 border border-border/50 shadow-sm bg-gradient-to-br from-pink-500/5 to-transparent flex flex-col justify-center text-left relative overflow-hidden group h-full hover:border-pink-500/30 transition-colors">
             <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider mb-1">Comm. Pending</span>
-            <h3 className="text-2xl font-black text-foreground">{formatCompactCurrency(DEMO_DATA.commPending)}</h3>
+            <h3 className="text-2xl font-black text-foreground">{formatCompactCurrency(commPendingSum)}</h3>
             <div className="absolute top-4 right-4 text-pink-500/20 group-hover:text-pink-500/40 transition-colors"><Target size={24} /></div>
           </Card>
         </motion.div>
@@ -243,8 +311,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">Sales Funnel</h3>
             </div>
             <div className="flex-1 flex flex-col justify-center gap-4">
-              {DEMO_DATA.salesFunnel.map((stage, idx) => {
-                const maxCount = DEMO_DATA.salesFunnel[0].count;
+              {salesFunnelData.map((stage, idx) => {
+                const maxCount = Math.max(...salesFunnelData.map(s => s.count), 1);
                 const pct = (stage.count / maxCount) * 100;
                 return (
                   <div key={idx} className="flex flex-col gap-1.5">
@@ -413,21 +481,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                   <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500"><Calendar size={20} /></div>
                   <span className="text-sm font-bold text-foreground">Due Today</span>
                 </div>
-                <span className="text-lg font-black text-foreground">{DEMO_DATA.followUpCenter.dueToday}</span>
+                <span className="text-lg font-black text-foreground">{dueTodayCount}</span>
               </div>
               <div className="flex items-center justify-between p-4 rounded-xl bg-red-500/5 border border-red-500/10">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-red-500/10 text-red-500"><Activity size={20} /></div>
                   <span className="text-sm font-bold text-foreground">Overdue</span>
                 </div>
-                <span className="text-lg font-black text-red-500">{DEMO_DATA.followUpCenter.overdue}</span>
+                <span className="text-lg font-black text-red-500">{overdueCount}</span>
               </div>
               <div className="flex items-center justify-between p-4 rounded-xl bg-blue-500/5 border border-blue-500/10">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500"><ListTodo size={20} /></div>
                   <span className="text-sm font-bold text-foreground">Upcoming</span>
                 </div>
-                <span className="text-lg font-black text-foreground">{DEMO_DATA.followUpCenter.upcoming}</span>
+                <span className="text-lg font-black text-foreground">{upcomingCount}</span>
               </div>
             </div>
             <div className="p-3 border-t border-border/40 text-center mt-auto">
@@ -446,20 +514,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">Recent Activities</h3>
           </div>
           <div className="divide-y divide-border/40">
-            {DEMO_DATA.recentActivities.map((act, idx) => {
-              const Icon = act.icon;
-              return (
-                <div key={idx} className="p-4 flex items-center justify-between hover:bg-secondary/20 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-2 rounded-full ${act.color}`}>
-                      <Icon size={16} />
+            {recentActivities.length > 0 ? (
+              recentActivities.map((act, idx) => {
+                const Icon = act.icon;
+                return (
+                  <div key={idx} className="p-4 flex items-center justify-between hover:bg-secondary/20 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-2 rounded-full ${act.color}`}>
+                        <Icon size={16} />
+                      </div>
+                      <span className="text-sm font-medium text-foreground">{act.text}</span>
                     </div>
-                    <span className="text-sm font-medium text-foreground">{act.text}</span>
+                    <span className="text-xs font-semibold text-muted-foreground">{act.time}</span>
                   </div>
-                  <span className="text-xs font-semibold text-muted-foreground">{act.time}</span>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <div className="text-xs font-semibold text-muted-foreground py-10 text-center flex items-center justify-center h-full">
+                No recent activities recorded
+              </div>
+            )}
           </div>
         </Card>
       </motion.div>
@@ -471,82 +545,94 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">Recent Leads</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-border/40 text-xs text-muted-foreground uppercase tracking-wider bg-secondary/5">
-                  <th className="p-4 font-bold">Lead Name</th>
-                  <th className="p-4 font-bold">Source</th>
-                  <th className="p-4 font-bold">Status</th>
-                  <th className="p-4 font-bold">Owner</th>
-                  <th className="p-4 font-bold text-right">Value</th>
-                  <th className="p-4 font-bold text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {recentLeads.map((lead, idx) => (
-                  <tr key={idx} className="hover:bg-secondary/10 transition-colors">
-                    <td className="p-4">
-                      <span className="text-sm font-bold text-foreground">{lead.name}</span>
-                    </td>
-                    <td className="p-4">
-                      <span className="text-xs font-semibold text-muted-foreground">{lead.source}</span>
-                    </td>
-                    <td className="p-4">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        lead.status === 'New' ? 'bg-blue-500/10 text-blue-500' :
-                        lead.status === 'Contacted' ? 'bg-violet-500/10 text-violet-500' :
-                        lead.status === 'Qualified' ? 'bg-cyan-500/10 text-cyan-500' :
-                        lead.status === 'Claimed' ? 'bg-indigo-500/10 text-indigo-500' :
-                        lead.status === 'Negotiation' ? 'bg-pink-500/10 text-pink-500' :
-                        lead.status === 'Won' || lead.status === 'Converted' ? 'bg-emerald-500/10 text-emerald-500' :
-                        'bg-secondary text-muted-foreground'
-                      }`}>
-                        {lead.status}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2 text-xs font-semibold">
-                        {lead.owner !== 'Unassigned' && (
-                          <div className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[8px] font-black">
-                            {lead.owner.charAt(0)}
-                          </div>
-                        )}
-                        <span className={lead.owner === 'Unassigned' ? 'text-muted-foreground italic' : 'text-foreground'}>
-                          {lead.owner}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-right">
-                      <span className="text-sm font-black text-emerald-500">{formatCompactCurrency(lead.value)}</span>
-                    </td>
-                    <td className="p-4 text-center">
-                      {lead.owner === 'Unassigned' ? (
-                        <button 
-                          onClick={() => handleClaimLead(idx)}
-                          className="px-3 py-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
-                        >
-                          Claim
-                        </button>
-                      ) : (
-                        <select 
-                          value={lead.status}
-                          onChange={(e) => handleUpdateStatus(idx, e)}
-                          className="px-2 py-1 bg-secondary text-foreground text-[10px] font-bold rounded-md border border-border cursor-pointer outline-none focus:ring-1 focus:ring-primary"
-                        >
-                          <option value="New">New</option>
-                          <option value="Claimed">Claimed</option>
-                          <option value="Contacted">Contacted</option>
-                          <option value="Qualified">Qualified</option>
-                          <option value="Negotiation">Negotiation</option>
-                          <option value="Won">Won</option>
-                          <option value="Lost">Lost</option>
-                        </select>
-                      )}
-                    </td>
+            {recentLeadsList.length > 0 ? (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-border/40 text-xs text-muted-foreground uppercase tracking-wider bg-secondary/5">
+                    <th className="p-4 font-bold">Lead Name</th>
+                    <th className="p-4 font-bold">Source</th>
+                    <th className="p-4 font-bold">Status</th>
+                    <th className="p-4 font-bold">Owner</th>
+                    <th className="p-4 font-bold text-right">Value</th>
+                    <th className="p-4 font-bold text-center">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border/40">
+                  {recentLeadsList.map((lead) => (
+                    <tr key={lead.id} className="hover:bg-secondary/10 transition-colors">
+                      <td className="p-4">
+                        <span className="text-sm font-bold text-foreground">{lead.name}</span>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-xs font-semibold text-muted-foreground">{lead.source}</span>
+                      </td>
+                      <td className="p-4">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          lead.status === 'NEW' ? 'bg-blue-500/10 text-blue-500' :
+                          lead.status === 'CONTACTED' ? 'bg-violet-500/10 text-violet-500' :
+                          lead.status === 'QUALIFIED' ? 'bg-cyan-500/10 text-cyan-500' :
+                          lead.status === 'CLAIMED' ? 'bg-indigo-500/10 text-indigo-500' :
+                          lead.status === 'NEGOTIATION' ? 'bg-pink-500/10 text-pink-500' :
+                          ['WON', 'CONVERTED'].includes(lead.status) ? 'bg-emerald-500/10 text-emerald-500' :
+                          'bg-secondary text-muted-foreground'
+                        }`}>
+                          {getStatusLabel(lead.status)}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2 text-xs font-semibold">
+                          {lead.owner ? (
+                            <>
+                              <div className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[8px] font-black">
+                                {lead.owner_name.charAt(0)}
+                              </div>
+                              <span className="text-foreground">
+                                {lead.owner_name}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground italic">
+                              Unassigned
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <span className="text-sm font-black text-emerald-500">{formatCompactCurrency(parseFloat(lead.value))}</span>
+                      </td>
+                      <td className="p-4 text-center">
+                        {!lead.owner ? (
+                          <button 
+                            onClick={() => handleClaimLead(lead.id)}
+                            className="px-3 py-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
+                          >
+                            Claim
+                          </button>
+                        ) : (
+                          <select 
+                            value={lead.status}
+                            onChange={(e) => handleUpdateStatus(lead.id, e)}
+                            className="px-2 py-1 bg-secondary text-foreground text-[10px] font-bold rounded-md border border-border cursor-pointer outline-none focus:ring-1 focus:ring-primary"
+                          >
+                            <option value="NEW">New</option>
+                            <option value="CLAIMED">Claimed</option>
+                            <option value="CONTACTED">Contacted</option>
+                            <option value="QUALIFIED">Qualified</option>
+                            <option value="NEGOTIATION">Negotiation</option>
+                            <option value="WON">Won</option>
+                            <option value="LOST">Lost</option>
+                          </select>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-xs font-semibold text-muted-foreground py-10 text-center flex flex-col items-center justify-center h-full">
+                No leads registered in database
+              </div>
+            )}
           </div>
         </Card>
       </motion.div>

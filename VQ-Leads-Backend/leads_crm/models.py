@@ -73,11 +73,18 @@ class LeadForm(models.Model):
 class Lead(models.Model):
     STATUS_CHOICES = [
         ('NEW', 'New'),
+        ('AVAILABLE', 'Available'),
+        ('CLAIMED', 'Claimed'),
         ('CONTACTED', 'Contacted'),
         ('IN_PROGRESS', 'In Progress'),
         ('QUALIFIED', 'Qualified'),
-        ('LOST', 'Lost'),
+        ('FOLLOW_UP', 'Follow-up'),
+        ('PROPOSAL_SENT', 'Proposal Sent'),
+        ('NEGOTIATION', 'Negotiation'),
         ('WON', 'Won'),
+        ('LOST', 'Lost'),
+        ('DUPLICATE', 'Duplicate'),
+        ('INVALID', 'Invalid'),
     ]
 
     name = models.CharField(max_length=150)

@@ -131,6 +131,8 @@ class LeadViewSet(viewsets.ModelViewSet):
             led_teams = user.led_teams.all()
             member_ids = User.objects.filter(sales_teams__in=led_teams).values_list('id', flat=True)
             return Lead.objects.filter(Q(owner=user) | Q(owner_id__in=member_ids) | Q(owner__isnull=True)).order_by('-created_at')
+        if user.profile.role == 'AGENT':
+            return Lead.objects.filter(Q(owner=user) | Q(owner__isnull=True)).order_by('-created_at')
         return Lead.objects.filter(owner=user).order_by('-created_at')
 
     def perform_create(self, serializer):

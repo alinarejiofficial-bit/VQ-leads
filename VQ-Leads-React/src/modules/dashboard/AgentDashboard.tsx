@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, type User, type Lead, type DashboardStats } from '../../api';
+import { api, type User, type Lead, type Task, type FollowUp, type Commission } from '../../api';
 import { Card } from '../../components/common/Card';
 import { Input } from '../../components/forms/Input';
 
@@ -10,15 +10,20 @@ import {
   Search,
   Briefcase,
   Trophy,
-  XCircle,
-  TrendingUp,
   Phone,
   ThumbsUp,
   ThumbsDown,
   Award,
   Trash2,
   FileEdit,
-  Sparkles
+  Sparkles,
+  Calendar,
+  DollarSign,
+  CheckSquare,
+  Clock,
+  AlertTriangle,
+  Percent,
+  ChevronRight
 } from 'lucide-react';
 
 interface AgentDashboardProps {
@@ -32,15 +37,28 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
 
+  // Interactive attention filter state
+  const [activeAttentionFilter, setActiveAttentionFilter] = useState<'ALL' | 'OVERDUE' | 'NO_NEXT_ACTION' | 'STALE'>('ALL');
+
   // Fetch data
-  const { data: leads = [], isLoading, refetch: refetchLeads } = useQuery<Lead[]>({
+  const { data: leads = [], isLoading: leadsLoading, refetch: refetchLeads } = useQuery<Lead[]>({
     queryKey: ['leads'],
     queryFn: api.getLeads,
   });
 
-  useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats'],
-    queryFn: api.getDashboardStats,
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
+    queryKey: ['tasks'],
+    queryFn: api.getTasks,
+  });
+
+  const { data: followups = [], isLoading: followupsLoading } = useQuery<FollowUp[]>({
+    queryKey: ['followups'],
+    queryFn: api.getFollowUps,
+  });
+
+  const { data: commissions = [], isLoading: commissionsLoading } = useQuery<Commission[]>({
+    queryKey: ['commissions'],
+    queryFn: api.getCommissions,
   });
 
   // Mutations
@@ -49,17 +67,89 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['followups'] });
+      queryClient.invalidateQueries({ queryKey: ['commissions'] });
     },
   });
 
   // Agent-specific metrics
   const myLeads = leads.filter(l => l.owner === user.id);
-  const myPipeline = myLeads.filter(l => !['CONVERTED', 'LOST'].includes(l.status));
-  const myConverted = myLeads.filter(l => l.status === 'CONVERTED').length;
-  const myLost = myLeads.filter(l => l.status === 'LOST').length;
-  const conversionRate = myConverted + myLost > 0
-    ? Math.round((myConverted / (myConverted + myLost)) * 100)
-    : 0;
+  const activeLeads = myLeads.filter(l => !['WON', 'LOST', 'CONVERTED'].includes(l.status));
+
+  // KPI Calculations
+  // 1. My Leads (Total owned)
+  const myLeadsCount = myLeads.length;
+
+  // 2. Today's Calls (Uncompleted follow-ups scheduled for today)
+  const todayStr = new Date().toDateString();
+  const todayCalls = followups.filter(f => {
+    if (f.completed) return false;
+    const fDateStr = new Date(f.scheduled_time).toDateString();
+    return fDateStr === todayStr;
+  });
+  const todayCallsCount = todayCalls.length;
+
+  // 3. Pending Follow-ups (All uncompleted follow-ups)
+  const pendingFollowups = followups.filter(f => !f.completed);
+  const pendingFollowupsCount = pendingFollowups.length;
+
+  // 4. Tasks Due (Pending tasks)
+  const tasksDue = tasks.filter(t => t.status === 'PENDING');
+  const tasksDueCount = tasksDue.length;
+
+  // 5. Converted Leads (Status WON or CONVERTED)
+  const convertedLeads = myLeads.filter(l => ['WON', 'CONVERTED'].includes(l.status));
+  const convertedLeadsCount = convertedLeads.length;
+
+  // 6. Revenue (Sum of value of converted leads)
+  const totalRevenue = convertedLeads.reduce((sum, l) => sum + parseFloat(l.value || '0'), 0);
+
+  // 7. Commission (Total earned from APPROVED or PAID commissions)
+  const earnedCommission = commissions
+    .filter(c => ['APPROVED', 'PAID'].includes(c.status))
+    .reduce((sum, c) => sum + parseFloat(c.amount || '0'), 0);
+
+  // 8. Win Rate (Converted leads / Total closed leads)
+  const lostCount = myLeads.filter(l => l.status === 'LOST').length;
+  const totalClosed = convertedLeadsCount + lostCount;
+  const winRate = totalClosed > 0 ? Math.round((convertedLeadsCount / totalClosed) * 100) : 0;
+
+  // Attention Required widgets criteria
+  // A. Overdue Followups: Uncompleted followups scheduled before "now"
+  const now = new Date();
+  const overdueFollowups = followups.filter(f => !f.completed && new Date(f.scheduled_time) < now);
+  const overdueFollowupsCount = overdueFollowups.length;
+  const overdueLeadIds = new Set(overdueFollowups.map(f => f.lead));
+
+  // B. Leads with No Next Action: Active leads with no pending tasks and no pending followups
+  const leadsWithNoNextAction = activeLeads.filter(l => {
+    const hasPendingTask = tasks.some(t => t.lead === l.id && t.status === 'PENDING');
+    const hasPendingFollowup = followups.some(f => f.lead === l.id && !f.completed);
+    return !hasPendingTask && !hasPendingFollowup;
+  });
+  const leadsWithNoNextActionCount = leadsWithNoNextAction.length;
+  const noNextActionLeadIds = new Set(leadsWithNoNextAction.map(l => l.id));
+
+  // C. Stale Leads (>48h no activity): Active leads whose updated_at date is older than 48 hours
+  const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const staleLeads = activeLeads.filter(l => new Date(l.updated_at) < fortyEightHoursAgo);
+  const staleLeadsCount = staleLeads.length;
+  const staleLeadIds = new Set(staleLeads.map(l => l.id));
+
+  // Filter My Leads Pipeline based on selection
+  const filteredMyLeads = myLeads.filter(lead => {
+    if (activeAttentionFilter === 'OVERDUE') {
+      return overdueLeadIds.has(lead.id);
+    }
+    if (activeAttentionFilter === 'NO_NEXT_ACTION') {
+      return noNextActionLeadIds.has(lead.id);
+    }
+    if (activeAttentionFilter === 'STALE') {
+      return staleLeadIds.has(lead.id);
+    }
+    return true;
+  });
 
   // Available leads (unassigned)
   const availableLeads = leads.filter(l => !l.owner);
@@ -90,7 +180,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
       { id: leadId, data: { status: newStatus as any } },
       {
         onSuccess: () => {
-          if (newStatus === 'CONVERTED') {
+          if (newStatus === 'WON' || newStatus === 'CONVERTED') {
             showSuccess(`🎉 Spectacular! Lead "${leadName}" has been successfully converted!`);
           } else if (newStatus === 'LOST') {
             showSuccess(`Lead "${leadName}" status updated to Lost.`);
@@ -102,6 +192,14 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
     );
   };
 
+  const handleLeadUpdated = () => {
+    refetchLeads();
+    queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    queryClient.invalidateQueries({ queryKey: ['followups'] });
+    queryClient.invalidateQueries({ queryKey: ['commissions'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+  };
+
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(''), 4500);
@@ -109,7 +207,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
 
   const formatCurrency = (amount: string | number) => {
     const val = typeof amount === 'string' ? parseFloat(amount) : amount;
-    if (isNaN(val)) return '$0';
+    if (isNaN(val)) return '₹0';
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
@@ -123,11 +221,13 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
       AVAILABLE: 'Available',
       CLAIMED: 'Pipeline',
       CONTACTED: 'Contacted',
+      IN_PROGRESS: 'In Progress',
       QUALIFIED: 'Qualified',
       FOLLOW_UP: 'Follow-up',
       PROPOSAL_SENT: 'Proposal',
       NEGOTIATION: 'Negotiation',
       CONVERTED: 'Converted',
+      WON: 'Converted',
       LOST: 'Lost',
     };
     return map[status] || status;
@@ -139,30 +239,42 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
       AVAILABLE: 'bg-cyan-500/15 text-cyan-600 border-cyan-500/25',
       CLAIMED: 'bg-violet-500/15 text-violet-600 border-violet-500/25',
       CONTACTED: 'bg-orange-500/15 text-orange-600 border-orange-500/25',
+      IN_PROGRESS: 'bg-amber-500/15 text-amber-600 border-amber-500/25',
       QUALIFIED: 'bg-indigo-500/15 text-indigo-600 border-indigo-500/25',
-      FOLLOW_UP: 'bg-amber-500/15 text-amber-600 border-amber-500/25',
+      FOLLOW_UP: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/25',
       PROPOSAL_SENT: 'bg-teal-500/15 text-teal-600 border-teal-500/25',
       NEGOTIATION: 'bg-pink-500/15 text-pink-600 border-pink-500/25',
       CONVERTED: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25',
+      WON: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25',
       LOST: 'bg-red-500/15 text-red-600 border-red-500/25',
     };
     return map[status] || 'bg-gray-500/15 text-gray-600 border-gray-500/25';
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.08 } },
-  };
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 100 } },
+  const toggleAttentionFilter = (filter: 'OVERDUE' | 'NO_NEXT_ACTION' | 'STALE') => {
+    if (activeAttentionFilter === filter) {
+      setActiveAttentionFilter('ALL');
+    } else {
+      setActiveAttentionFilter(filter);
+    }
   };
 
-  if (isLoading) {
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.04 } },
+  };
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 120 } },
+  };
+
+  const isAllLoading = leadsLoading || tasksLoading || followupsLoading || commissionsLoading;
+
+  if (isAllLoading) {
     return (
       <div className="p-8 flex items-center justify-center h-[calc(100vh-70px)]">
         <div className="text-muted-foreground text-sm font-semibold animate-pulse">
-          Loading your dashboard...
+          Loading agent dashboard...
         </div>
       </div>
     );
@@ -194,68 +306,260 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
         animate="show"
         className="grid grid-cols-2 lg:grid-cols-4 gap-4"
       >
-        {/* Active Pipeline */}
+        {/* My Leads */}
+        <motion.div variants={itemVariants}>
+          <Card className="p-5 border border-border/50 bg-gradient-to-br from-indigo-500/5 to-transparent flex items-center justify-between group hover:border-indigo-500/30 transition-colors h-full">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider mb-1">
+                My Leads
+              </span>
+              <h3 className="text-3xl font-black text-foreground">{myLeadsCount}</h3>
+              <span className="text-[11px] text-muted-foreground mt-0.5">Total assigned leads</span>
+            </div>
+            <div className="p-3 rounded-xl bg-indigo-500/10 text-indigo-500 group-hover:bg-indigo-500/20 transition-colors">
+              <Briefcase size={22} />
+            </div>
+          </Card>
+        </motion.div>
+
+        {/* Today's Calls */}
         <motion.div variants={itemVariants}>
           <Card className="p-5 border border-border/50 bg-gradient-to-br from-violet-500/5 to-transparent flex items-center justify-between group hover:border-violet-500/30 transition-colors h-full">
             <div className="flex flex-col">
               <span className="text-[10px] font-extrabold text-violet-600 uppercase tracking-wider mb-1">
-                Active Pipeline
+                Today's Calls
               </span>
-              <h3 className="text-3xl font-black text-foreground">{myPipeline.length}</h3>
-              <span className="text-[11px] text-muted-foreground mt-0.5">Claimed leads in progress</span>
+              <h3 className="text-3xl font-black text-foreground">{todayCallsCount}</h3>
+              <span className="text-[11px] text-muted-foreground mt-0.5">Scheduled for today</span>
             </div>
             <div className="p-3 rounded-xl bg-violet-500/10 text-violet-500 group-hover:bg-violet-500/20 transition-colors">
-              <Briefcase size={24} />
+              <Calendar size={22} />
             </div>
           </Card>
         </motion.div>
 
-        {/* Closed Converted */}
+        {/* Pending Follow-ups */}
+        <motion.div variants={itemVariants}>
+          <Card className="p-5 border border-border/50 bg-gradient-to-br from-sky-500/5 to-transparent flex items-center justify-between group hover:border-sky-500/30 transition-colors h-full">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-extrabold text-sky-600 uppercase tracking-wider mb-1">
+                Pending Follow-ups
+              </span>
+              <h3 className="text-3xl font-black text-foreground">{pendingFollowupsCount}</h3>
+              <span className="text-[11px] text-muted-foreground mt-0.5">Uncompleted followups</span>
+            </div>
+            <div className="p-3 rounded-xl bg-sky-500/10 text-sky-500 group-hover:bg-sky-500/20 transition-colors">
+              <Phone size={22} />
+            </div>
+          </Card>
+        </motion.div>
+
+        {/* Tasks Due */}
+        <motion.div variants={itemVariants}>
+          <Card className="p-5 border border-border/50 bg-gradient-to-br from-slate-500/5 to-transparent flex items-center justify-between group hover:border-slate-500/30 transition-colors h-full">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider mb-1">
+                Tasks Due
+              </span>
+              <h3 className="text-3xl font-black text-foreground">{tasksDueCount}</h3>
+              <span className="text-[11px] text-muted-foreground mt-0.5">Pending checklist items</span>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-500/10 text-slate-500 group-hover:bg-slate-500/20 transition-colors">
+              <CheckSquare size={22} />
+            </div>
+          </Card>
+        </motion.div>
+
+        {/* Converted Leads */}
         <motion.div variants={itemVariants}>
           <Card className="p-5 border border-border/50 bg-gradient-to-br from-emerald-500/5 to-transparent flex items-center justify-between group hover:border-emerald-500/30 transition-colors h-full">
             <div className="flex flex-col">
               <span className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-wider mb-1">
-                Closed Converted
+                Converted Leads
               </span>
-              <h3 className="text-3xl font-black text-foreground">{myConverted}</h3>
-              <span className="text-[11px] text-muted-foreground mt-0.5">Successful conversions</span>
+              <h3 className="text-3xl font-black text-foreground">{convertedLeadsCount}</h3>
+              <span className="text-[11px] text-muted-foreground mt-0.5">Successful closures</span>
             </div>
             <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20 transition-colors">
-              <Trophy size={24} />
+              <Trophy size={22} />
             </div>
           </Card>
         </motion.div>
 
-        {/* Closed Rejected */}
+        {/* Win Rate */}
         <motion.div variants={itemVariants}>
-          <Card className="p-5 border border-border/50 bg-gradient-to-br from-red-500/5 to-transparent flex items-center justify-between group hover:border-red-500/30 transition-colors h-full">
+          <Card className="p-5 border border-border/50 bg-gradient-to-br from-cyan-500/5 to-transparent flex items-center justify-between group hover:border-cyan-500/30 transition-colors h-full">
             <div className="flex flex-col">
-              <span className="text-[10px] font-extrabold text-red-600 uppercase tracking-wider mb-1">
-                Closed Rejected
+              <span className="text-[10px] font-extrabold text-cyan-600 uppercase tracking-wider mb-1">
+                Win Rate
               </span>
-              <h3 className="text-3xl font-black text-foreground">{myLost}</h3>
-              <span className="text-[11px] text-muted-foreground mt-0.5">Leads dropped</span>
+              <h3 className="text-3xl font-black text-foreground">{winRate}%</h3>
+              <span className="text-[11px] text-muted-foreground mt-0.5">Won vs lost closed leads</span>
             </div>
-            <div className="p-3 rounded-xl bg-red-500/10 text-red-500 group-hover:bg-red-500/20 transition-colors">
-              <XCircle size={24} />
+            <div className="p-3 rounded-xl bg-cyan-500/10 text-cyan-500 group-hover:bg-cyan-500/20 transition-colors">
+              <Percent size={22} />
             </div>
           </Card>
         </motion.div>
 
-        {/* Conversion Rate */}
+        {/* Revenue */}
         <motion.div variants={itemVariants}>
-          <Card className="p-5 border border-border/50 bg-gradient-to-br from-blue-500/5 to-transparent flex items-center justify-between group hover:border-blue-500/30 transition-colors h-full">
+          <Card className="p-5 border border-border/50 bg-gradient-to-br from-amber-500/5 to-transparent flex items-center justify-between group hover:border-amber-500/30 transition-colors h-full">
             <div className="flex flex-col">
-              <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider mb-1">
-                Conversion Rate
+              <span className="text-[10px] font-extrabold text-amber-600 uppercase tracking-wider mb-1">
+                Revenue
               </span>
-              <h3 className="text-3xl font-black text-foreground">{conversionRate}%</h3>
-              <span className="text-[11px] text-muted-foreground mt-0.5">Based on closed sales</span>
+              <h3 className="text-3xl font-black text-foreground">{formatCurrency(totalRevenue)}</h3>
+              <span className="text-[11px] text-muted-foreground mt-0.5">Value of won deals</span>
             </div>
-            <div className="p-3 rounded-xl bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors">
-              <TrendingUp size={24} />
+            <div className="p-3 rounded-xl bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20 transition-colors">
+              <DollarSign size={22} />
             </div>
           </Card>
+        </motion.div>
+
+        {/* Commission */}
+        <motion.div variants={itemVariants}>
+          <Card className="p-5 border border-border/50 bg-gradient-to-br from-rose-500/5 to-transparent flex items-center justify-between group hover:border-rose-500/30 transition-colors h-full">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-extrabold text-rose-600 uppercase tracking-wider mb-1">
+                Commission
+              </span>
+              <h3 className="text-3xl font-black text-foreground">{formatCurrency(earnedCommission)}</h3>
+              <span className="text-[11px] text-muted-foreground mt-0.5">Approved & Paid earnings</span>
+            </div>
+            <div className="p-3 rounded-xl bg-rose-500/10 text-rose-500 group-hover:bg-rose-500/20 transition-colors">
+              <Award size={22} />
+            </div>
+          </Card>
+        </motion.div>
+      </motion.div>
+
+      {/* Attention Required Widgets - Action Center */}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+      >
+        {/* Overdue Follow-ups Alert */}
+        <motion.div variants={itemVariants}>
+          <button
+            onClick={() => toggleAttentionFilter('OVERDUE')}
+            className={`w-full text-left p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between group relative overflow-hidden cursor-pointer ${
+              activeAttentionFilter === 'OVERDUE'
+                ? 'bg-rose-500/10 border-rose-500 ring-2 ring-rose-500/20 shadow-md shadow-rose-500/5'
+                : 'bg-card hover:bg-secondary/15 border-border/60 hover:border-rose-500/30'
+            }`}
+          >
+            <div className="flex items-center gap-3.5 z-10">
+              <div className={`p-2.5 rounded-xl transition-colors ${
+                activeAttentionFilter === 'OVERDUE'
+                  ? 'bg-rose-500/20 text-rose-600'
+                  : 'bg-rose-500/10 text-rose-500 group-hover:bg-rose-500/15'
+              }`}>
+                <Clock size={20} className={overdueFollowupsCount > 0 ? "animate-pulse" : ""} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Overdue Follow-ups</h4>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Needs immediate call logging</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 z-10">
+              <span className={`text-xl font-black px-2.5 py-0.5 rounded-lg ${
+                overdueFollowupsCount > 0
+                  ? 'bg-rose-500/15 text-rose-600 border border-rose-500/25'
+                  : 'bg-secondary text-muted-foreground'
+              }`}>
+                {overdueFollowupsCount}
+              </span>
+              <ChevronRight size={14} className="text-muted-foreground opacity-55 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+            </div>
+            {/* Subtle glow effect */}
+            {overdueFollowupsCount > 0 && (
+              <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-full blur-2xl pointer-events-none" />
+            )}
+          </button>
+        </motion.div>
+
+        {/* Leads with No Next Action Alert */}
+        <motion.div variants={itemVariants}>
+          <button
+            onClick={() => toggleAttentionFilter('NO_NEXT_ACTION')}
+            className={`w-full text-left p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between group relative overflow-hidden cursor-pointer ${
+              activeAttentionFilter === 'NO_NEXT_ACTION'
+                ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20 shadow-md shadow-amber-500/5'
+                : 'bg-card hover:bg-secondary/15 border-border/60 hover:border-amber-500/30'
+            }`}
+          >
+            <div className="flex items-center gap-3.5 z-10">
+              <div className={`p-2.5 rounded-xl transition-colors ${
+                activeAttentionFilter === 'NO_NEXT_ACTION'
+                  ? 'bg-amber-500/20 text-amber-600'
+                  : 'bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/15'
+              }`}>
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">No Next Action</h4>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Leads with no pending task/call</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 z-10">
+              <span className={`text-xl font-black px-2.5 py-0.5 rounded-lg ${
+                leadsWithNoNextActionCount > 0
+                  ? 'bg-amber-500/15 text-amber-600 border border-amber-500/25'
+                  : 'bg-secondary text-muted-foreground'
+              }`}>
+                {leadsWithNoNextActionCount}
+              </span>
+              <ChevronRight size={14} className="text-muted-foreground opacity-55 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+            </div>
+            {/* Subtle glow effect */}
+            {leadsWithNoNextActionCount > 0 && (
+              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+            )}
+          </button>
+        </motion.div>
+
+        {/* Stale Leads Alert */}
+        <motion.div variants={itemVariants}>
+          <button
+            onClick={() => toggleAttentionFilter('STALE')}
+            className={`w-full text-left p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between group relative overflow-hidden cursor-pointer ${
+              activeAttentionFilter === 'STALE'
+                ? 'bg-orange-500/10 border-orange-500 ring-2 ring-orange-500/20 shadow-md shadow-orange-500/5'
+                : 'bg-card hover:bg-secondary/15 border-border/60 hover:border-orange-500/30'
+            }`}
+          >
+            <div className="flex items-center gap-3.5 z-10">
+              <div className={`p-2.5 rounded-xl transition-colors ${
+                activeAttentionFilter === 'STALE'
+                  ? 'bg-orange-500/20 text-orange-600'
+                  : 'bg-orange-500/10 text-orange-500 group-hover:bg-orange-500/15'
+              }`}>
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Stale Leads</h4>
+                <p className="text-[11px] text-muted-foreground mt-0.5">No activity for over 48 hours</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 z-10">
+              <span className={`text-xl font-black px-2.5 py-0.5 rounded-lg ${
+                staleLeadsCount > 0
+                  ? 'bg-orange-500/15 text-orange-600 border border-orange-500/25'
+                  : 'bg-secondary text-muted-foreground'
+              }`}>
+                {staleLeadsCount}
+              </span>
+              <ChevronRight size={14} className="text-muted-foreground opacity-55 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+            </div>
+            {/* Subtle glow effect */}
+            {staleLeadsCount > 0 && (
+              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full blur-2xl pointer-events-none" />
+            )}
+          </button>
         </motion.div>
       </motion.div>
 
@@ -402,17 +706,27 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
         >
           <Card className="border border-border/60 overflow-hidden h-full flex flex-col">
             {/* Panel Header */}
-            <div className="p-5 border-b border-border/40 flex items-center gap-3 bg-secondary/10">
-              <span className="text-xl">💼</span>
-              <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">
-                My Leads Pipeline ({myLeads.length})
-              </h3>
+            <div className="p-5 border-b border-border/40 flex items-center justify-between gap-3 bg-secondary/10">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">💼</span>
+                <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">
+                  My Leads Pipeline ({activeAttentionFilter === 'ALL' ? myLeads.length : `${filteredMyLeads.length} of ${myLeads.length}`})
+                </h3>
+              </div>
+              {activeAttentionFilter !== 'ALL' && (
+                <button
+                  onClick={() => setActiveAttentionFilter('ALL')}
+                  className="flex items-center gap-1 text-[10px] font-black text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 px-2.5 py-1 rounded-xl transition-all cursor-pointer"
+                >
+                  Clear Filter
+                </button>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4" style={{ scrollbarWidth: 'thin' }}>
-              {myLeads.length > 0 ? (
+              {filteredMyLeads.length > 0 ? (
                 <div className="flex flex-col gap-3">
-                  {myLeads.map((lead) => (
+                  {filteredMyLeads.map((lead) => (
                     <div
                       key={lead.id}
                       className="border border-border/60 rounded-xl p-4 bg-card hover:border-border transition-all flex flex-col gap-3"
@@ -449,7 +763,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
                         </button>
                         <button
                           onClick={() => handleStatusChange(lead.id, 'QUALIFIED', lead.name)}
-                          className="flex-1 min-w-[70px] inline-flex items-center justify-center gap-1 px-2 py-1.5 bg-amber-500/10 text-amber-600 text-[10px] font-bold rounded-lg border border-amber-500/20 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                          className="flex-1 min-w-[70px] inline-flex items-center justify-center gap-1 px-2 py-1.5 bg-indigo-500/10 text-indigo-600 text-[10px] font-bold rounded-lg border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors cursor-pointer"
                         >
                           <ThumbsUp size={11} /> Interested
                         </button>
@@ -462,7 +776,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
                       </div>
                       <div className="flex gap-1.5">
                         <button
-                          onClick={() => handleStatusChange(lead.id, 'CONVERTED', lead.name)}
+                          onClick={() => handleStatusChange(lead.id, 'WON', lead.name)}
                           className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-lg border border-emerald-500/20 hover:bg-emerald-500/25 transition-colors cursor-pointer"
                         >
                           <Award size={11} /> Convert
@@ -488,10 +802,22 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <span className="text-4xl mb-3">🎒</span>
-                  <h4 className="text-sm font-bold text-foreground mb-1">Pipeline Empty</h4>
+                  <h4 className="text-sm font-bold text-foreground mb-1">
+                    {activeAttentionFilter !== 'ALL' ? 'No Filtered Leads' : 'Pipeline Empty'}
+                  </h4>
                   <p className="text-xs text-muted-foreground max-w-[240px]">
-                    Claim leads from the available pool on the left to start working!
+                    {activeAttentionFilter !== 'ALL'
+                      ? 'No leads in your pipeline match the selected attention filter.'
+                      : 'Claim leads from the available pool on the left to start working!'}
                   </p>
+                  {activeAttentionFilter !== 'ALL' && (
+                    <button
+                      onClick={() => setActiveAttentionFilter('ALL')}
+                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 rounded-lg hover:bg-primary/20 transition-all cursor-pointer"
+                    >
+                      Clear Active Filter
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -503,10 +829,13 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
       <LeadDetailsDrawer
         leadId={selectedLeadId || 0}
         isOpen={selectedLeadId !== null}
-        onClose={() => setSelectedLeadId(null)}
+        onClose={() => {
+          setSelectedLeadId(null);
+          handleLeadUpdated();
+        }}
         currentUser={user}
         agents={[]}
-        onLeadUpdated={refetchLeads}
+        onLeadUpdated={handleLeadUpdated}
       />
     </motion.div>
   );
