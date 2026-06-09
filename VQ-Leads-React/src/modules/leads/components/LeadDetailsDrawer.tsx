@@ -16,7 +16,8 @@ import {
   Clock,
   FileText,
   MessageSquare,
-  FileBox
+  FileBox,
+  Pencil
 } from 'lucide-react';
 
 interface LeadDetailsDrawerProps {
@@ -58,6 +59,8 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
   const [taskAssignedTo, setTaskAssignedTo] = useState<number>(currentUser.id);
   const [followupTime, setFollowupTime] = useState('');
   const [followupNotes, setFollowupNotes] = useState('');
+  const [editingFollowupId, setEditingFollowupId] = useState<number | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
 
   // Custom log states
   const [callSubject, setCallSubject] = useState('');
@@ -69,6 +72,7 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
 
   const isAdmin = currentUser.profile.role === 'ADMIN';
   const isLeaderOrAdmin = isAdmin || currentUser.profile.role === 'LEADER';
+  const canClaimLead = !isAdmin && lead && !lead.owner;
 
   const fetchLeadData = async () => {
     try {
@@ -101,6 +105,13 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
     if (isOpen && leadId) {
       fetchLeadData();
       setActiveTab('overview');
+      setEditingFollowupId(null);
+      setEditingTaskId(null);
+      setFollowupTime('');
+      setFollowupNotes('');
+      setTaskTitle('');
+      setTaskDueDate('');
+      setTaskAssignedTo(currentUser.id);
     }
   }, [isOpen, leadId]);
 
@@ -186,22 +197,51 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
     }
   };
 
-  const handleAddTask = async (e: React.FormEvent) => {
+  const toDatetimeLocalValue = (dateString: string) => {
+    const d = new Date(dateString);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const cancelEditTask = () => {
+    setEditingTaskId(null);
+    setTaskTitle('');
+    setTaskDueDate('');
+    setTaskAssignedTo(currentUser.id);
+  };
+
+  const startEditTask = (task: Task) => {
+    setEditingTaskId(task.id);
+    setTaskTitle(task.title);
+    setTaskDueDate(task.due_date ? toDatetimeLocalValue(task.due_date) : '');
+    setTaskAssignedTo(task.assigned_to);
+  };
+
+  const handleSaveTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskTitle.trim() || !lead) return;
     try {
-      await api.createTask({
-        lead: lead.id,
-        title: taskTitle,
-        due_date: taskDueDate || null,
-        assigned_to: taskAssignedTo,
-        status: 'PENDING'
-      });
-      setTaskTitle('');
-      setTaskDueDate('');
+      if (editingTaskId) {
+        await api.updateTask(editingTaskId, {
+          title: taskTitle,
+          due_date: taskDueDate || null,
+          assigned_to: taskAssignedTo,
+        });
+        cancelEditTask();
+      } else {
+        await api.createTask({
+          lead: lead.id,
+          title: taskTitle,
+          due_date: taskDueDate || null,
+          assigned_to: taskAssignedTo,
+          status: 'PENDING'
+        });
+        setTaskTitle('');
+        setTaskDueDate('');
+      }
       fetchLeadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to create task');
+      alert(err instanceof Error ? err.message : 'Failed to save task');
     }
   };
 
@@ -215,21 +255,41 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
     }
   };
 
-  const handleAddFollowup = async (e: React.FormEvent) => {
+  const cancelEditFollowup = () => {
+    setEditingFollowupId(null);
+    setFollowupTime('');
+    setFollowupNotes('');
+  };
+
+  const startEditFollowup = (followup: FollowUp) => {
+    setEditingFollowupId(followup.id);
+    setFollowupTime(toDatetimeLocalValue(followup.scheduled_time));
+    setFollowupNotes(followup.notes || '');
+  };
+
+  const handleSaveFollowup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!followupTime || !lead) return;
     try {
-      await api.createFollowUp({
-        lead: lead.id,
-        scheduled_time: followupTime,
-        notes: followupNotes,
-        completed: false
-      });
-      setFollowupTime('');
-      setFollowupNotes('');
+      if (editingFollowupId) {
+        await api.updateFollowUp(editingFollowupId, {
+          scheduled_time: followupTime,
+          notes: followupNotes,
+        });
+        cancelEditFollowup();
+      } else {
+        await api.createFollowUp({
+          lead: lead.id,
+          scheduled_time: followupTime,
+          notes: followupNotes,
+          completed: false
+        });
+        setFollowupTime('');
+        setFollowupNotes('');
+      }
       fetchLeadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to schedule follow-up');
+      alert(err instanceof Error ? err.message : 'Failed to save follow-up');
     }
   };
 
@@ -239,6 +299,17 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
       fetchLeadData();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to update follow-up');
+    }
+  };
+
+  const handleClaimLead = async () => {
+    if (!lead) return;
+    try {
+      await api.claimLead(lead.id);
+      onLeadUpdated();
+      fetchLeadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to claim lead');
     }
   };
 
@@ -280,9 +351,21 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
               <span className="text-[10px] bg-primary/10 px-2 py-0.5 rounded font-bold text-primary uppercase">Value: ${lead?.value}</span>
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer" onClick={onClose}>
-            <X size={16} />
-          </Button>
+          <div className="flex items-center gap-2">
+            {canClaimLead && (
+              <Button
+                type="button"
+                variant="outline"
+                className="border-primary/50 text-primary hover:bg-primary/10"
+                onClick={handleClaimLead}
+              >
+                <UserCheck size={15} className="mr-1.5" /> Claim Lead
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer" onClick={onClose}>
+              <X size={16} />
+            </Button>
+          </div>
         </div>
 
         {/* 8-Tab Navigation Bar */}
@@ -511,15 +594,7 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                           type="button" 
                           variant="outline" 
                           className="border-primary/50 text-primary hover:bg-primary/10 whitespace-nowrap"
-                          onClick={async () => {
-                            try {
-                              await api.updateLead(lead.id, { owner: currentUser.id, status: 'CLAIMED' });
-                              onLeadUpdated();
-                              fetchLeadData();
-                            } catch(err) {
-                              alert('Failed to claim lead');
-                            }
-                          }}
+                          onClick={handleClaimLead}
                         >
                           Claim
                         </Button>
@@ -619,7 +694,7 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                   <div className="text-center text-xs text-muted-foreground py-10 border border-dashed border-border/60 rounded-xl">No tasks assigned.</div>
                 ) : (
                   tasks.map(t => (
-                    <div key={t.id} className="flex items-start gap-3 p-3.5 rounded-xl border border-border/60 bg-card/20">
+                    <div key={t.id} className={`flex items-start gap-3 p-3.5 rounded-xl border bg-card/20 ${editingTaskId === t.id ? 'border-primary/50' : 'border-border/60'}`}>
                       <button type="button" className="text-muted-foreground hover:text-foreground mt-0.5 cursor-pointer" onClick={() => handleToggleTask(t)}>
                         {t.status === 'COMPLETED' ? (
                           <CheckCircle size={16} className="text-green-400 animate-pulse" />
@@ -627,7 +702,7 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                           <Circle size={16} />
                         )}
                       </button>
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1 flex-1 min-w-0">
                         <span className={`text-sm font-semibold ${t.status === 'COMPLETED' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                           {t.title}
                         </span>
@@ -636,13 +711,23 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                           <span>Assigned: {t.assigned_to_details?.first_name || 'System'}</span>
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-primary p-1 rounded-md hover:bg-primary/10 transition-colors shrink-0"
+                        onClick={() => startEditTask(t)}
+                        title="Edit task"
+                      >
+                        <Pencil size={14} />
+                      </button>
                     </div>
                   ))
                 )}
               </div>
 
-              <form onSubmit={handleAddTask} className="border-t border-border/40 pt-5 space-y-4 text-left">
-                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Add Task</h4>
+              <form onSubmit={handleSaveTask} className="border-t border-border/40 pt-5 space-y-4 text-left">
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                  {editingTaskId ? 'Edit Task' : 'Add Task'}
+                </h4>
                 <div className="flex flex-col gap-1.5">
                   <Input 
                     type="text" 
@@ -677,9 +762,16 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                     </select>
                   </div>
                 </div>
-                <Button type="submit" className="w-full">
-                  <Plus size={15} className="mr-1" /> Create Task
-                </Button>
+                <div className="flex gap-2">
+                  {editingTaskId && (
+                    <Button type="button" variant="outline" className="flex-1" onClick={cancelEditTask}>
+                      Cancel
+                    </Button>
+                  )}
+                  <Button type="submit" className={editingTaskId ? 'flex-1' : 'w-full'}>
+                    {editingTaskId ? 'Update Task' : <><Plus size={15} className="mr-1" /> Create Task</>}
+                  </Button>
+                </div>
               </form>
             </div>
           )}
@@ -693,7 +785,7 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                   <div className="text-center text-xs text-muted-foreground py-10 border border-dashed border-border/60 rounded-xl">No followups scheduled.</div>
                 ) : (
                   followups.map(f => (
-                    <div key={f.id} className="flex items-start gap-3 p-3.5 rounded-xl border border-border/60 bg-card/20">
+                    <div key={f.id} className={`flex items-start gap-3 p-3.5 rounded-xl border bg-card/20 ${editingFollowupId === f.id ? 'border-primary/50' : 'border-border/60'}`}>
                       <button type="button" className="text-muted-foreground hover:text-foreground mt-0.5 cursor-pointer" onClick={() => handleToggleFollowup(f)}>
                         {f.completed ? (
                           <CheckCircle size={16} className="text-green-400" />
@@ -701,7 +793,7 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                           <Circle size={16} />
                         )}
                       </button>
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1 flex-1 min-w-0">
                         <span className={`text-sm font-semibold ${f.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                           {f.notes || 'Followup call'}
                         </span>
@@ -710,13 +802,23 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                           <span>Scheduled by: {f.created_by_name}</span>
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-primary p-1 rounded-md hover:bg-primary/10 transition-colors shrink-0"
+                        onClick={() => startEditFollowup(f)}
+                        title="Edit reminder"
+                      >
+                        <Pencil size={14} />
+                      </button>
                     </div>
                   ))
                 )}
               </div>
 
-              <form onSubmit={handleAddFollowup} className="border-t border-border/40 pt-5 space-y-4 text-left">
-                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Schedule Follow-up</h4>
+              <form onSubmit={handleSaveFollowup} className="border-t border-border/40 pt-5 space-y-4 text-left">
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                  {editingFollowupId ? 'Edit Follow-up' : 'Schedule Follow-up'}
+                </h4>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Scheduled Date & Time</label>
                   <Input 
@@ -736,9 +838,16 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                     onChange={e => setFollowupNotes(e.target.value)} 
                   />
                 </div>
-                <Button type="submit" className="w-full">
-                  <Plus size={15} className="mr-1" /> Schedule Reminder
-                </Button>
+                <div className="flex gap-2">
+                  {editingFollowupId && (
+                    <Button type="button" variant="outline" className="flex-1" onClick={cancelEditFollowup}>
+                      Cancel
+                    </Button>
+                  )}
+                  <Button type="submit" className={editingFollowupId ? 'flex-1' : 'w-full'}>
+                    {editingFollowupId ? 'Update Reminder' : <><Plus size={15} className="mr-1" /> Schedule Reminder</>}
+                  </Button>
+                </div>
               </form>
             </div>
           )}

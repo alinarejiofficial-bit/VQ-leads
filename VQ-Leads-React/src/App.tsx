@@ -26,7 +26,6 @@ import { Activities } from './modules/activities';
 import FollowUps from './modules/followups';
 import { Notifications } from './modules/notifications';
 import { AuditLogs } from './modules/audit-logs';
-import { LandingPage } from './modules/landing';
 
 // --- AUTH GATES ---
 interface ProtectedRouteProps {
@@ -98,8 +97,12 @@ function App() {
           } 
         />
 
-        {/* Public Landing Page */}
-        <Route path="/" element={<LandingPage />} />
+        <Route
+          path="/"
+          element={
+            <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />
+          }
+        />
 
         {/* Protected Pages wrapped in AdminLayout */}
         <Route 
@@ -266,7 +269,7 @@ function App() {
         />
 
         {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
       </Routes>
     </Router>
   );

@@ -21,6 +21,7 @@ import {
 interface SubItem {
   label: string;
   path: string;
+  roles?: string[];
 }
 
 interface NavItem {
@@ -62,8 +63,8 @@ export const Sidebar: React.FC = () => {
         { label: 'My Leads', path: '/leads?filter=my' },
         { label: 'Converted Leads', path: '/leads?filter=converted' },
         { label: 'Lost Leads', path: '/leads?filter=lost' },
-        { label: 'Import Leads', path: '/leads?action=import' },
-        { label: 'Export Leads', path: '/leads?action=export' },
+        { label: 'Import Leads', path: '/leads?action=import', roles: ['ADMIN'] },
+        { label: 'Export Leads', path: '/leads?action=export', roles: ['ADMIN'] },
       ]
     },
     { 
@@ -206,7 +207,10 @@ export const Sidebar: React.FC = () => {
           {filteredItems.map(item => {
             const IconComponent = item.icon;
             const isActive = isPathActive(item.path);
-            const hasChildren = item.children && item.children.length > 0;
+            const visibleChildren = item.children?.filter(
+              child => !child.roles || child.roles.includes(user.profile.role)
+            ) ?? [];
+            const hasChildren = visibleChildren.length > 0;
             const isOpen = openMenus[item.label] ?? isActive;
 
             return (
@@ -249,12 +253,12 @@ export const Sidebar: React.FC = () => {
                   <div 
                     className="overflow-hidden transition-all duration-300 ease-in-out"
                     style={{ 
-                      maxHeight: isOpen ? `${(item.children!.length) * 36}px` : '0px',
+                      maxHeight: isOpen ? `${visibleChildren.length * 36}px` : '0px',
                       opacity: isOpen ? 1 : 0 
                     }}
                   >
                     <div className="ml-5 pl-4 border-l border-border/60 mt-0.5 mb-1 flex flex-col gap-0.5">
-                      {item.children!.map((child) => {
+                      {visibleChildren.map((child) => {
                         const childActive = isSubItemActive(child.path);
                         return (
                           <Link

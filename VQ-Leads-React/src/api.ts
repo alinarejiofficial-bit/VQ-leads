@@ -150,6 +150,50 @@ export interface DashboardCharts {
   monthlyRevenue: MonthlyRevenueItem[];
 }
 
+export interface AgentDashboardData {
+  summary: {
+    myLeads: number;
+    followups: number;
+    tasksDue: number;
+    commission: number;
+  };
+  pipeline: { label: string; count: number }[];
+  monthlyPerformance: {
+    callsMade: number;
+    conversions: number;
+    revenue: number;
+    conversionRate: number;
+  };
+  hotLeads: {
+    id: number;
+    name: string;
+    source: string;
+    priority: string;
+    status: string;
+  }[];
+  todaysFollowups: {
+    id: number;
+    time: string;
+    leadName: string;
+    notes: string;
+  }[];
+  todaysTasks: {
+    id: number;
+    title: string;
+    priority: string;
+  }[];
+  recentActivities: {
+    id: number;
+    time: string;
+    label: string;
+  }[];
+  overdueFollowups: {
+    id: number;
+    leadName: string;
+    overdueLabel: string;
+  }[];
+}
+
 // Request helpers
 function getHeaders(): HeadersInit {
   const headers: HeadersInit = {
@@ -246,6 +290,12 @@ export const api = {
     return request<Lead>(`/leads/${id}/`, {
       method: 'PATCH',
       body: JSON.stringify(lead),
+    });
+  },
+
+  async claimLead(id: number): Promise<Lead> {
+    return request<Lead>(`/leads/${id}/claim/`, {
+      method: 'POST',
     });
   },
 
@@ -414,5 +464,9 @@ export const api = {
 
   async getDashboardCharts(): Promise<DashboardCharts> {
     return request<DashboardCharts>('/dashboard/charts/');
+  },
+
+  async getAgentDashboard(): Promise<AgentDashboardData> {
+    return request<AgentDashboardData>('/dashboard/agent/');
   },
 };

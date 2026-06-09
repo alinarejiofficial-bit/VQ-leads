@@ -4,7 +4,7 @@ from .views import (
     LoginView, LogoutView, MeView, AgentsView, LeadViewSet,
     SalesTeamViewSet, LeadFormViewSet, PublicFormDetailView,
     PublicFormSubmitView, TaskViewSet, FollowUpViewSet,
-    CommissionViewSet, DashboardStatsView, DashboardChartsView
+    CommissionViewSet, DashboardStatsView, DashboardChartsView, AgentDashboardView
 )
 
 router = DefaultRouter()
@@ -31,6 +31,7 @@ urlpatterns = [
     # Dashboard endpoints
     path('dashboard/stats/', DashboardStatsView.as_view(), name='dashboard_stats'),
     path('dashboard/charts/', DashboardChartsView.as_view(), name='dashboard_charts'),
+    path('dashboard/agent/', AgentDashboardView.as_view(), name='dashboard_agent'),
 
     # ViewSet Router
     path('', include(router.urls)),

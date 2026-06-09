@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type User, type Lead } from '../../api';
 import { Button } from '../../components/forms/Button';
@@ -7,7 +8,7 @@ import { Input } from '../../components/forms/Input';
 import { Dialog } from '../../components/common/Dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/datatable/Table';
 import { LeadDetailsDrawer } from './components/LeadDetailsDrawer';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, UserCheck } from 'lucide-react';
 
 interface LeadsProps {
   user: User;
@@ -15,11 +16,25 @@ interface LeadsProps {
 
 export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const urlFilter = searchParams.get('filter');
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+
+  useEffect(() => {
+    if (!urlFilter) {
+      setSearch('');
+      setStatusFilter('');
+      setSourceFilter('');
+      setOwnerFilter('');
+    }
+    setViewMode('list');
+  }, [location.search, urlFilter]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
 
@@ -33,6 +48,9 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const [newLeadOwner, setNewLeadOwner] = useState<number | null>(null);
 
   const isAdmin = user.profile.role === 'ADMIN';
+  const canClaimLeads = !isAdmin;
+
+  const canClaimLead = (lead: Lead) => canClaimLeads && !lead.owner;
 
   // React Query fetch
   const { data: leads = [], refetch: refetchLeads } = useQuery<Lead[]>({
@@ -75,6 +93,22 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
     }
   });
 
+  const claimLeadMutation = useMutation({
+    mutationFn: api.claimLead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
+    onError: (err: Error) => {
+      alert(err.message || 'Failed to claim lead');
+    }
+  });
+
+  const handleClaimLead = (e: React.MouseEvent, leadId: number) => {
+    e.stopPropagation();
+    claimLeadMutation.mutate(leadId);
+  };
+
   const handleCreateLead = (e: React.FormEvent) => {
     e.preventDefault();
     createLeadMutation.mutate({
@@ -102,7 +136,21 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
     const matchesOwner = !ownerFilter ||
       (ownerFilter === 'unassigned' && !l.owner) ||
       (l.owner && l.owner.toString() === ownerFilter);
-    return matchesSearch && matchesStatus && matchesSource && matchesOwner;
+
+    let matchesSidebarFilter = true;
+    if (urlFilter === 'available') {
+      matchesSidebarFilter = !l.owner;
+    } else if (urlFilter === 'claimed') {
+      matchesSidebarFilter = !!l.owner;
+    } else if (urlFilter === 'my') {
+      matchesSidebarFilter = l.owner === user.id;
+    } else if (urlFilter === 'converted') {
+      matchesSidebarFilter = l.status === 'WON';
+    } else if (urlFilter === 'lost') {
+      matchesSidebarFilter = l.status === 'LOST';
+    }
+
+    return matchesSearch && matchesStatus && matchesSource && matchesOwner && matchesSidebarFilter;
   });
 
   const sources = Array.from(new Set(leads.map(l => l.source)));
@@ -204,12 +252,13 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                 <TableHead>Owner</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
+                {canClaimLeads && <TableHead>Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredLeads.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={canClaimLeads ? 8 : 7} className="text-center text-muted-foreground py-10">
                     No leads match your criteria.
                   </TableCell>
                 </TableRow>
@@ -233,6 +282,24 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                       </span>
                     </TableCell>
                     <TableCell>{new Date(l.created_at).toLocaleDateString()}</TableCell>
+                    {canClaimLeads && (
+                      <TableCell onClick={e => e.stopPropagation()}>
+                        {canClaimLead(l) ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs border-primary/50 text-primary hover:bg-primary/10"
+                            disabled={claimLeadMutation.isPending}
+                            onClick={e => handleClaimLead(e, l.id)}
+                          >
+                            <UserCheck size={14} className="mr-1" /> Claim
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}
@@ -268,9 +335,22 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                       <div className="flex justify-between items-center text-xs mt-2 pt-2.5 border-t border-border/40">
                         <span className="font-semibold text-foreground">${l.value}</span>
                         <span className="text-[10px] bg-muted/40 border border-border/40 px-1.5 py-0.5 rounded text-muted-foreground max-w-[100px] truncate">
-                          {l.owner_name}
+                          {l.owner_name || 'Unassigned'}
                         </span>
                       </div>
+
+                      {canClaimLead(l) && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-2 h-8 text-xs border-primary/50 text-primary hover:bg-primary/10"
+                          disabled={claimLeadMutation.isPending}
+                          onClick={e => handleClaimLead(e, l.id)}
+                        >
+                          <UserCheck size={14} className="mr-1" /> Claim Lead
+                        </Button>
+                      )}
 
                       {/* Manual board transition triggers */}
                       <div className="flex gap-1.5 mt-3 pt-2 border-t border-border/40 overflow-x-auto justify-end">

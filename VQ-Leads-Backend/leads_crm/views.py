@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -115,7 +116,7 @@ class LeadViewSet(viewsets.ModelViewSet):
             return Lead.objects.none()
         if user.profile.role == 'ADMIN':
             return Lead.objects.all().order_by('-created_at')
-        return Lead.objects.filter(owner=user).order_by('-created_at')
+        return Lead.objects.filter(Q(owner=user) | Q(owner__isnull=True)).order_by('-created_at')
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -181,6 +182,30 @@ class LeadViewSet(viewsets.ModelViewSet):
             for comm in commissions:
                 comm.amount = updated_lead.value * (comm.rate / Decimal('100.0'))
                 comm.save()
+
+    @action(detail=True, methods=['post'])
+    def claim(self, request, pk=None):
+        lead = self.get_object()
+        user = request.user
+
+        if user.profile.role == 'ADMIN':
+            raise ValidationError({'error': 'Admins should assign leads manually.'})
+
+        if lead.owner is not None:
+            raise ValidationError({'error': 'This lead has already been claimed.'})
+
+        lead.owner = user
+        lead.save()
+
+        LeadActivity.objects.create(
+            lead=lead,
+            user=user,
+            activity_type='CLAIM',
+            description=f"Lead claimed by {user.get_full_name() or user.username}."
+        )
+
+        serializer = self.get_serializer(lead)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def notes(self, request, pk=None):
@@ -546,4 +571,218 @@ class DashboardChartsView(APIView):
             'leadsTimeline': leads_timeline,
             'leaderboard': leaderboard,
             'monthlyRevenue': monthly_rev
+        })
+
+
+class AgentDashboardView(APIView):
+    def get(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        now = timezone.now()
+        today = now.date()
+        month_start = today.replace(day=1)
+
+        my_leads = Lead.objects.filter(owner=user)
+        followups_qs = FollowUp.objects.filter(lead__owner=user, completed=False)
+        tasks_qs = Task.objects.filter(assigned_to=user, status='PENDING')
+        commissions_qs = Commission.objects.filter(agent=user, status__in=['APPROVED', 'PAID'])
+
+        earned_commissions = commissions_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        total_leads = my_leads.count()
+        pending_followups = followups_qs.count()
+        tasks_due = tasks_qs.count()
+        todays_calls = LeadActivity.objects.filter(
+            lead__owner=user,
+            created_at__date=today,
+            description__startswith='[CALL]'
+        ).count()
+        converted_leads = my_leads.filter(status='WON').count()
+        revenue_generated = my_leads.filter(status='WON').aggregate(total=Sum('value'))['total'] or Decimal('0.00')
+
+        status_map = {item['status']: item['count'] for item in my_leads.values('status').annotate(count=Count('id'))}
+        pipeline = [
+            {'label': 'New', 'count': status_map.get('NEW', 0)},
+            {'label': 'Contacted', 'count': status_map.get('CONTACTED', 0)},
+            {'label': 'Qualified', 'count': status_map.get('QUALIFIED', 0)},
+            {'label': 'Proposal', 'count': 0},
+            {'label': 'Negotiation', 'count': status_map.get('IN_PROGRESS', 0)},
+            {'label': 'Converted', 'count': status_map.get('WON', 0)},
+        ]
+
+        month_leads = my_leads.filter(updated_at__date__gte=month_start)
+        won_month = month_leads.filter(status='WON')
+        month_revenue = won_month.aggregate(total=Sum('value'))['total'] or Decimal('0.00')
+        month_conversions = won_month.count()
+        month_calls = LeadActivity.objects.filter(
+            lead__owner=user,
+            created_at__date__gte=month_start,
+            description__startswith='[CALL]'
+        ).count()
+        month_total = my_leads.count()
+        conversion_pct = round((month_conversions / month_total * 100), 1) if month_total > 0 else 0.0
+
+        # Activity timeline — last 14 days (calls + conversions)
+        start_date = today - datetime.timedelta(days=13)
+        daily_calls = LeadActivity.objects.filter(
+            lead__owner=user,
+            created_at__date__gte=start_date,
+            description__startswith='[CALL]'
+        ).annotate(date=TruncDate('created_at')).values('date').annotate(count=Count('id'))
+        calls_map = {item['date'].strftime('%Y-%m-%d'): item['count'] for item in daily_calls if item['date']}
+
+        daily_conversions = my_leads.filter(
+            status='WON',
+            updated_at__date__gte=start_date
+        ).annotate(date=TruncDate('updated_at')).values('date').annotate(count=Count('id'))
+        conversions_map = {item['date'].strftime('%Y-%m-%d'): item['count'] for item in daily_conversions if item['date']}
+
+        activity_timeline = []
+        curr = start_date
+        while curr <= today:
+            date_str = curr.strftime('%Y-%m-%d')
+            activity_timeline.append({
+                'date': curr.strftime('%b %d'),
+                'count': calls_map.get(date_str, 0),
+                'convertedCount': conversions_map.get(date_str, 0),
+            })
+            curr += datetime.timedelta(days=1)
+
+        # Monthly revenue — last 6 months
+        six_months_ago = today - datetime.timedelta(days=180)
+        monthly_won = my_leads.filter(
+            status='WON',
+            updated_at__date__gte=six_months_ago
+        ).values('updated_at__year', 'updated_at__month').annotate(
+            revenue=Sum('value')
+        ).order_by('updated_at__year', 'updated_at__month')
+
+        monthly_revenue = []
+        for item in monthly_won:
+            dt = datetime.date(item['updated_at__year'], item['updated_at__month'], 1)
+            monthly_revenue.append({
+                'label': dt.strftime('%b'),
+                'value': float(item['revenue'] or 0.0),
+            })
+
+        pipeline_chart = [
+            {'label': stage['label'], 'value': stage['count'], 'color': color}
+            for stage, color in zip(pipeline, [
+                '#3b82f6', '#8b5cf6', '#06b6d4', '#f59e0b', '#f97316', '#10b981'
+            ])
+        ]
+
+        def lead_priority(lead):
+            value = float(lead.value)
+            if value >= 10000 or lead.status in ('QUALIFIED', 'IN_PROGRESS'):
+                return 'High'
+            if value >= 5000 or lead.status == 'CONTACTED':
+                return 'Medium'
+            return 'Low'
+
+        status_labels = {
+            'NEW': 'New',
+            'CONTACTED': 'Contacted',
+            'QUALIFIED': 'Qualified',
+            'IN_PROGRESS': 'Negotiation',
+            'WON': 'Converted',
+            'LOST': 'Lost',
+        }
+
+        hot_leads = []
+        for lead in my_leads.exclude(status__in=['LOST', 'WON']).order_by('-value')[:5]:
+            hot_leads.append({
+                'id': lead.id,
+                'name': lead.name,
+                'source': lead.source,
+                'priority': lead_priority(lead),
+                'status': status_labels.get(lead.status, lead.status),
+            })
+
+        todays_followups = []
+        for f in followups_qs.filter(scheduled_time__date=today).order_by('scheduled_time')[:8]:
+            todays_followups.append({
+                'id': f.id,
+                'time': f.scheduled_time.strftime('%I:%M %p').lstrip('0'),
+                'leadName': f.lead.name,
+                'notes': f.notes or 'Follow-up',
+            })
+
+        todays_tasks = []
+        for t in tasks_qs.filter(due_date__date=today).order_by('due_date')[:8]:
+            days_left = (t.due_date.date() - today).days if t.due_date else 3
+            priority = 'High' if days_left <= 0 else 'Medium' if days_left <= 2 else 'Low'
+            todays_tasks.append({
+                'id': t.id,
+                'title': t.title,
+                'priority': priority,
+            })
+
+        if not todays_tasks:
+            for t in tasks_qs.order_by('due_date')[:5]:
+                days_left = (t.due_date.date() - today).days if t.due_date else 3
+                priority = 'High' if days_left <= 0 else 'Medium' if days_left <= 2 else 'Low'
+                todays_tasks.append({
+                    'id': t.id,
+                    'title': t.title,
+                    'priority': priority,
+                })
+
+        recent_activities = []
+        for act in LeadActivity.objects.filter(lead__owner=user).select_related('lead').order_by('-created_at')[:8]:
+            time_str = act.created_at.strftime('%I:%M %p').lstrip('0')
+            desc = act.description
+            if act.activity_type == 'CLAIM':
+                label = f"Lead Claimed: {act.lead.name}"
+            elif desc.startswith('[CALL]'):
+                label = f"Call Logged: {act.lead.name}"
+            elif 'follow' in desc.lower() or act.activity_type == 'FOLLOW_UP':
+                label = 'Follow-up Scheduled'
+            elif act.activity_type == 'STATUS_CHANGE':
+                parts = desc.split(' to ')
+                new_status = parts[-1].rstrip('.') if parts else act.lead.status
+                label = f"Status → {status_labels.get(new_status, new_status)}"
+            elif desc.startswith('[NOTE]'):
+                label = f"Note Added: {act.lead.name}"
+            elif desc.startswith('[EMAIL]'):
+                label = f"Email Logged: {act.lead.name}"
+            else:
+                label = desc[:60]
+            recent_activities.append({'id': act.id, 'time': time_str, 'label': label})
+
+        overdue_followups = []
+        for f in followups_qs.filter(scheduled_time__lt=now).order_by('scheduled_time')[:8]:
+            delta_days = (today - f.scheduled_time.date()).days
+            if delta_days <= 0:
+                overdue_label = 'Today'
+            elif delta_days == 1:
+                overdue_label = '1 Day Overdue'
+            else:
+                overdue_label = f'{delta_days} Days Overdue'
+            overdue_followups.append({
+                'id': f.id,
+                'leadName': f.lead.name,
+                'overdueLabel': overdue_label,
+            })
+
+        return Response({
+            'summary': {
+                'myLeads': total_leads,
+                'followups': pending_followups,
+                'tasksDue': tasks_due,
+                'commission': float(earned_commissions),
+            },
+            'pipeline': pipeline,
+            'monthlyPerformance': {
+                'callsMade': month_calls,
+                'conversions': month_conversions,
+                'revenue': float(month_revenue),
+                'conversionRate': conversion_pct,
+            },
+            'hotLeads': hot_leads,
+            'todaysFollowups': todays_followups,
+            'todaysTasks': todays_tasks,
+            'recentActivities': recent_activities,
+            'overdueFollowups': overdue_followups,
         })
