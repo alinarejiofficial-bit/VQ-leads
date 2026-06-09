@@ -38,7 +38,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     { label: 'In Progress', value: stats.statusBreakdown.IN_PROGRESS || 0, color: '#f59e0b' },
     { label: 'Qualified', value: stats.statusBreakdown.QUALIFIED || 0, color: 'var(--primary)' },
     { label: 'Won', value: stats.statusBreakdown.WON || 0, color: '#10b981' },
-    { label: 'Lost', value: stats.statusBreakdown.LOST || 0, color: '#ef4444' }
+    { label: 'Lost', value: stats.statusBreakdown.LOST || 0, color: '#ef4444' },
   ] : [];
 
   return (
@@ -120,11 +120,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 charts.leaderboard.map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/10">
                     <div className="flex items-center gap-3">
-                      <span className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold ${idx === 0 ? 'bg-amber-500 text-black' :
-                          idx === 1 ? 'bg-slate-400 text-black' :
-                            idx === 2 ? 'bg-amber-700 text-white' :
-                              'bg-muted text-muted-foreground'
-                        }`}>
+                      <span
+                        className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          idx === 0 ? 'bg-amber-500 text-black' :
+                            idx === 1 ? 'bg-slate-400 text-black' :
+                              idx === 2 ? 'bg-amber-700 text-white' :
+                                'bg-muted text-muted-foreground'
+                        }`}
+                      >
                         {idx + 1}
                       </span>
                       <div className="flex flex-col text-left">
@@ -167,145 +170,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </Card>
       </div>
     </div>
-  );
-};
-export default Dashboard;
-<span className="text-foreground">
-  {lead.owner_name}
-</span>
-                            </>
-                          ) : (
-  <span className="text-muted-foreground italic">
-    Unassigned
-  </span>
-)}
-                        </div >
-                      </td >
-                      <td className="p-4 text-right">
-                        <span className="text-sm font-black text-emerald-500">{formatCompactCurrency(parseFloat(lead.value))}</span>
-                      </td>
-                      <td className="p-4 text-center">
-                        {!lead.owner ? (
-                          <button 
-                            onClick={() => handleClaimLead(lead.id)}
-                            className="px-3 py-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
-                          >
-                            Claim
-                          </button>
-                        ) : (
-                          <select 
-                            value={lead.status}
-                            onChange={(e) => handleUpdateStatus(lead.id, e)}
-                            className="px-2 py-1 bg-secondary text-foreground text-[10px] font-bold rounded-md border border-border cursor-pointer outline-none focus:ring-1 focus:ring-primary"
-                          >
-                            <option value="NEW">New</option>
-                            <option value="CLAIMED">Claimed</option>
-                            <option value="CONTACTED">Contacted</option>
-                            <option value="QUALIFIED">Qualified</option>
-                            <option value="NEGOTIATION">Negotiation</option>
-                            <option value="WON">Won</option>
-                            <option value="LOST">Lost</option>
-                          </select>
-                        )}
-                      </td>
-                    </tr >
-                  ))}
-                </tbody >
-              </table >
-            ) : (
-  <div className="text-xs font-semibold text-muted-foreground py-10 text-center flex flex-col items-center justify-center h-full">
-    No leads registered in database
-  </div>
-)}
-          </div >
-        </Card >
-      </motion.div >
-
-  {/* New Lead Modal */ }
-  < Dialog isOpen = { isAddModalOpen } onClose = {() => setIsAddModalOpen(false)} title = "Add New Lead" >
-    <form onSubmit={handleCreateLead} className="space-y-4">
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-semibold text-foreground">Contact Name *</label>
-        <Input
-          type="text"
-          value={newLeadName}
-          onChange={e => setNewLeadName(e.target.value)}
-          required
-        />
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-semibold text-foreground">Company Name</label>
-        <Input
-          type="text"
-          value={newLeadCompany}
-          onChange={e => setNewLeadCompany(e.target.value)}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-foreground">Email</label>
-          <Input
-            type="email"
-            value={newLeadEmail}
-            onChange={e => setNewLeadEmail(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-foreground">Phone</label>
-          <Input
-            type="text"
-            value={newLeadPhone}
-            onChange={e => setNewLeadPhone(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-foreground">Deal Value (₹)</label>
-          <Input
-            type="number"
-            step="0.01"
-            value={newLeadValue}
-            onChange={e => setNewLeadValue(e.target.value)}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-foreground">Lead Source</label>
-          <Input
-            type="text"
-            value={newLeadSource}
-            onChange={e => setNewLeadSource(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-semibold text-foreground">Assign Agent</label>
-        <select
-          className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
-          value={newLeadOwner || ''}
-          onChange={e => setNewLeadOwner(e.target.value ? Number(e.target.value) : null)}
-        >
-          <option value="">Unassigned</option>
-          {agents.map(a => (
-            <option key={a.id} value={a.id}>{a.first_name} {a.last_name} ({a.username})</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
-        <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
-        <Button type="submit" disabled={createLeadMutation.isPending}>
-          {createLeadMutation.isPending ? 'Creating...' : 'Create Lead'}
-        </Button>
-      </div>
-    </form>
-      </Dialog >
-    </motion.div >
   );
 };
 
