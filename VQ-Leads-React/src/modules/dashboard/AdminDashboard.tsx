@@ -22,6 +22,13 @@ export const AdminDashboard: React.FC = () => {
     queryFn: api.getAgents,
   });
 
+  // NOTE: all hooks must run before any conditional return (Rules of Hooks)
+  const timelineData = useMemo(() => {
+    const data = charts?.leadsTimeline || [];
+    if (timelineRange === 'weekly') return data.slice(-7);
+    return data;
+  }, [charts?.leadsTimeline, timelineRange]);
+
   if (statsLoading || chartsLoading) {
     return (
       <div className="p-8 flex items-center justify-center h-[calc(100vh-70px)]">
@@ -42,12 +49,6 @@ export const AdminDashboard: React.FC = () => {
     { label: 'Won', value: stats.statusBreakdown.WON || 0, color: '#10b981' },
     { label: 'Lost', value: stats.statusBreakdown.LOST || 0, color: '#ef4444' },
   ] : [];
-
-  const timelineData = useMemo(() => {
-    const data = charts?.leadsTimeline || [];
-    if (timelineRange === 'weekly') return data.slice(-7);
-    return data;
-  }, [charts?.leadsTimeline, timelineRange]);
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">

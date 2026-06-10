@@ -222,17 +222,43 @@ class LeadEmail(models.Model):
 
 class FollowUp(models.Model):
     FOLLOWUP_TYPE_CHOICES = [
-        ('CALL', 'Call'),
-        ('MEETING', 'Meeting'),
+        ('CALL', 'Phone Call'),
         ('EMAIL', 'Email'),
         ('WHATSAPP', 'WhatsApp'),
+        ('MEETING', 'Meeting'),
+        ('SITE_VISIT', 'Site Visit'),
+        ('DEMO', 'Demo Presentation'),
+        ('QUOTATION', 'Quotation Follow-up'),
+        ('PAYMENT_REMINDER', 'Payment Reminder'),
+    ]
+    PRIORITY_CHOICES = [
+        ('LOW', 'Low'),
+        ('MEDIUM', 'Medium'),
+        ('HIGH', 'High'),
+        ('URGENT', 'Urgent'),
+    ]
+    STATUS_CHOICES = [
+        ('SCHEDULED', 'Scheduled'),
+        ('COMPLETED', 'Completed'),
+        ('CANCELLED', 'Cancelled'),
     ]
 
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='followups')
     scheduled_time = models.DateTimeField()
     followup_type = models.CharField(max_length=20, choices=FOLLOWUP_TYPE_CHOICES, default='CALL')
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='MEDIUM')
+    reminder_time = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SCHEDULED')
     completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='completed_followups'
+    )
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     assigned_agent = models.ForeignKey(
         User,
@@ -242,9 +268,25 @@ class FollowUp(models.Model):
         related_name='assigned_followups'
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Follow-up for {self.lead.name} at {self.scheduled_time}"
+
+
+class FollowUpHistory(models.Model):
+    followup = models.ForeignKey(FollowUp, on_delete=models.CASCADE, related_name='history')
+    action = models.CharField(max_length=100)
+    old_value = models.TextField(blank=True)
+    new_value = models.TextField(blank=True)
+    performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='followup_history')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.followup_id}: {self.action}"
 
 
 class Task(models.Model):

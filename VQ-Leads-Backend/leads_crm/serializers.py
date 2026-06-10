@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
-    UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task,
+    UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, FollowUpHistory, Task,
     Commission, Notification, ImportHistory, ImportLog, ImportMappingTemplate, ExportHistory,
     CallLog, LeadNote, LeadEmail, TaskComment, TaskHistory
 )
@@ -90,28 +90,76 @@ class LeadActivitySerializer(serializers.ModelSerializer):
         return "System"
 
 
+class FollowUpHistorySerializer(serializers.ModelSerializer):
+    performed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FollowUpHistory
+        fields = ['id', 'followup', 'action', 'old_value', 'new_value', 'performed_by', 'performed_by_name', 'created_at']
+
+    def get_performed_by_name(self, obj):
+        if obj.performed_by:
+            name = f"{obj.performed_by.first_name} {obj.performed_by.last_name}".strip()
+            return name if name else obj.performed_by.username
+        return 'System'
+
+
 class FollowUpSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
+    completed_by_name = serializers.SerializerMethodField()
     lead_name = serializers.ReadOnlyField(source='lead.name')
+    lead_phone = serializers.ReadOnlyField(source='lead.phone')
+    lead_email = serializers.ReadOnlyField(source='lead.email')
+    lead_source = serializers.ReadOnlyField(source='lead.source')
     assigned_agent_details = UserSerializer(source='assigned_agent', read_only=True)
-    status = serializers.SerializerMethodField()
+    effective_status = serializers.SerializerMethodField()
+    days_overdue = serializers.SerializerMethodField()
 
     class Meta:
         model = FollowUp
         fields = [
-            'id', 'lead', 'lead_name', 'scheduled_time', 'followup_type', 'notes', 'completed',
-            'status', 'created_by', 'created_by_name', 'assigned_agent', 'assigned_agent_details', 'created_at'
+            'id', 'lead', 'lead_name', 'lead_phone', 'lead_email', 'lead_source',
+            'scheduled_time', 'followup_type', 'priority', 'reminder_time', 'notes',
+            'status', 'effective_status', 'days_overdue', 'completed',
+            'completed_at', 'completed_by', 'completed_by_name',
+            'created_by', 'created_by_name', 'assigned_agent', 'assigned_agent_details',
+            'created_at', 'updated_at'
         ]
+        read_only_fields = ['completed_at', 'completed_by']
 
     def get_created_by_name(self, obj):
         name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
         return name if name else obj.created_by.username
 
-    def get_status(self, obj):
-        if obj.completed:
+    def get_completed_by_name(self, obj):
+        if obj.completed_by:
+            name = f"{obj.completed_by.first_name} {obj.completed_by.last_name}".strip()
+            return name if name else obj.completed_by.username
+        return ''
+
+    def get_effective_status(self, obj):
+        # COMPLETED / CANCELLED are persisted; UPCOMING / TODAY / OVERDUE derive from schedule
+        if obj.status == 'COMPLETED' or obj.completed:
             return 'COMPLETED'
+        if obj.status == 'CANCELLED':
+            return 'CANCELLED'
         from django.utils import timezone
-        return 'OVERDUE' if obj.scheduled_time < timezone.now() else 'PENDING'
+        now = timezone.now()
+        local_scheduled = timezone.localtime(obj.scheduled_time)
+        if obj.scheduled_time < now:
+            return 'OVERDUE'
+        if local_scheduled.date() == timezone.localtime(now).date():
+            return 'TODAY'
+        return 'UPCOMING'
+
+    def get_days_overdue(self, obj):
+        if obj.status != 'SCHEDULED' or obj.completed:
+            return 0
+        from django.utils import timezone
+        now = timezone.now()
+        if obj.scheduled_time >= now:
+            return 0
+        return (now - obj.scheduled_time).days
 
 
 class TaskCommentSerializer(serializers.ModelSerializer):
