@@ -18,6 +18,7 @@ from .serializers import (
     ImportHistorySerializer, ImportHistoryDetailSerializer,
     ImportMappingTemplateSerializer
 )
+from .audit import log_audit
 
 try:
     from openpyxl import load_workbook
@@ -415,6 +416,14 @@ class ImportExecuteView(APIView):
         history.duplicate_count = duplicate_count
         history.status = final_status
         history.save()
+
+        log_audit(
+            request, module='IMPORT', action='IMPORT_PERFORMED',
+            record_type='ImportHistory', record_id=history.id,
+            summary=f"Imported '{history.file_name}': {success_count} added, {duplicate_count} duplicates, {failed_count} failed.",
+            new_values={'file_name': history.file_name, 'success': success_count,
+                        'failed': failed_count, 'duplicates': duplicate_count, 'status': final_status},
+        )
 
         return Response(ImportHistoryDetailSerializer(history).data, status=status.HTTP_201_CREATED)
 

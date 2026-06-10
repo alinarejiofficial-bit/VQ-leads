@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from .models import Lead, FollowUp, ExportHistory
 from .serializers import ExportHistorySerializer
+from .audit import log_audit
 
 try:
     from openpyxl import Workbook
@@ -278,6 +279,13 @@ class ExportGenerateView(APIView):
                 'currentPageIds': request.data.get('currentPageIds') or [],
             },
             status='COMPLETED',
+        )
+
+        log_audit(
+            request, module='EXPORT', action='EXPORT_PERFORMED',
+            record_type='ExportHistory', record_id=history.id,
+            summary=f"Exported {total} lead(s) to '{file_name}'.",
+            new_values={'file_name': file_name, 'file_type': file_type, 'total_records': total},
         )
 
         return Response({

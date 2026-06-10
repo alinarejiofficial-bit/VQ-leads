@@ -12,6 +12,7 @@ import { MyLeadsPipeline } from './components/MyLeadsPipeline';
 import { ImportModule } from './components/ImportModule';
 import { ExportModule } from './components/ExportModule';
 import { Plus, Search, UserCheck } from 'lucide-react';
+import { OwnerLabel } from '../../components/common/OwnerLabel';
 
 interface LeadsProps {
   user: User;
@@ -22,9 +23,11 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const urlFilter = searchParams.get('filter');
+  const urlQuery = searchParams.get('q') || '';
+  const urlLeadId = searchParams.get('id');
   const action = searchParams.get('action');
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(urlQuery);
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
@@ -36,14 +39,30 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const canClaimLeads = !isAdmin;
 
   useEffect(() => {
-    if (!urlFilter) {
+    const q = searchParams.get('q') || '';
+    if (q) setSearch(q);
+
+    const leadIdParam = searchParams.get('id');
+    if (leadIdParam) {
+      const id = parseInt(leadIdParam, 10);
+      if (!Number.isNaN(id)) {
+        setSelectedLeadId(id);
+        setViewMode('list');
+      }
+    }
+
+    if (!urlFilter && !q && !leadIdParam) {
       setSearch('');
       setStatusFilter('');
       setSourceFilter('');
       setOwnerFilter('');
     }
-    setViewMode(isAdmin ? 'list' : 'pipeline');
-  }, [location.search, urlFilter, isAdmin]);
+    if (!isAdmin && !leadIdParam) {
+      setViewMode('pipeline');
+    } else if (leadIdParam || isAdmin) {
+      setViewMode('list');
+    }
+  }, [location.search, urlFilter, isAdmin, searchParams]);
 
   // Form states for new lead
   const [newLeadName, setNewLeadName] = useState('');
@@ -135,9 +154,13 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   };
 
   const filteredLeads = leads.filter(l => {
-    const matchesSearch = l.name.toLowerCase().includes(search.toLowerCase()) ||
-      l.company.toLowerCase().includes(search.toLowerCase()) ||
-      l.email.toLowerCase().includes(search.toLowerCase());
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      l.name.toLowerCase().includes(q) ||
+      l.company.toLowerCase().includes(q) ||
+      l.email.toLowerCase().includes(q) ||
+      l.phone.toLowerCase().includes(q) ||
+      l.id.toString() === search.trim();
     const matchesStatus = !statusFilter || l.status === statusFilter;
     const matchesSource = !sourceFilter || l.source === sourceFilter;
     const matchesOwner = !ownerFilter ||
@@ -322,7 +345,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                     <TableCell>{l.company || '-'}</TableCell>
                     <TableCell>{l.source}</TableCell>
                     <TableCell className="font-semibold">${l.value}</TableCell>
-                    <TableCell>{l.owner_name}</TableCell>
+                    <TableCell><OwnerLabel name={l.owner_name} ownerId={l.owner} /></TableCell>
                     <TableCell>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${l.status === 'NEW' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
                           l.status === 'CONTACTED' ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' :

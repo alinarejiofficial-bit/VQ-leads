@@ -16,6 +16,7 @@ import json
 import re
 
 from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission, CommissionSettings, Notification, ImportHistory, ExportHistory
+from .audit import log_audit
 from .serializers import (
     UserSerializer, UserProfileSerializer, SalesTeamSerializer,
     LeadFormSerializer, LeadSerializer, LeadActivitySerializer,
@@ -60,16 +61,32 @@ class LoginView(APIView):
         if user:
             refresh = RefreshToken.for_user(user)
             serializer = UserSerializer(user)
+            log_audit(
+                request, module='AUTH', action='USER_LOGIN', user=user,
+                record_type='User', record_id=user.id,
+                summary=f"{user.get_full_name() or user.username} logged in.",
+            )
             return Response({
                 'token': str(refresh.access_token),
                 'refresh': str(refresh),
                 'user': serializer.data
             })
+        log_audit(
+            request, module='AUTH', action='LOGIN_FAILED',
+            user_name=username or 'Unknown', role='',
+            summary=f"Failed login attempt for username '{username}'.",
+        )
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LogoutView(APIView):
     def post(self, request):
+        if request.user and request.user.is_authenticated:
+            log_audit(
+                request, module='AUTH', action='USER_LOGOUT',
+                record_type='User', record_id=request.user.id,
+                summary=f"{request.user.get_full_name() or request.user.username} logged out.",
+            )
         return Response({'success': 'Logged out successfully'})
 
 
@@ -128,6 +145,13 @@ class AgentsView(APIView):
             profile.commission_rate = Decimal(str(commission_rate))
         profile.save()
 
+        log_audit(
+            request, module='TEAM', action='TEAM_MEMBER_ADDED',
+            record_type='User', record_id=user.id,
+            summary=f"Added team member {user.get_full_name() or user.username} ({role}).",
+            new_values={'username': username, 'role': role, 'email': email},
+        )
+
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -146,13 +170,25 @@ class AgentDetailView(APIView):
         if not user:
             return Response({'error': 'Member not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        old_role = user.profile.role
+        old_values = {
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            'role': old_role,
+            'commission_rate': str(user.profile.commission_rate) if user.profile.commission_rate is not None else None,
+            'is_active': user.is_active,
+        }
+
         if 'first_name' in request.data:
             user.first_name = request.data['first_name']
         if 'last_name' in request.data:
             user.last_name = request.data['last_name']
         if 'email' in request.data:
             user.email = request.data['email']
+        role_changed = False
         if 'role' in request.data and request.data['role'] in ('AGENT', 'LEADER'):
+            role_changed = request.data['role'] != old_role
             user.profile.role = request.data['role']
             user.profile.save()
         if 'commission_rate' in request.data:
@@ -163,6 +199,29 @@ class AgentDetailView(APIView):
             user.is_active = bool(request.data['is_active'])
 
         user.save()
+
+        new_values = {
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            'role': user.profile.role,
+            'commission_rate': str(user.profile.commission_rate) if user.profile.commission_rate is not None else None,
+            'is_active': user.is_active,
+        }
+        member_label = user.get_full_name() or user.username
+        if role_changed:
+            log_audit(
+                request, module='TEAM', action='ROLE_CHANGED',
+                record_type='User', record_id=user.id,
+                summary=f"Changed role of {member_label} from {old_role} to {user.profile.role}.",
+                old_values={'role': old_role}, new_values={'role': user.profile.role},
+            )
+        log_audit(
+            request, module='TEAM', action='TEAM_MEMBER_UPDATED',
+            record_type='User', record_id=user.id,
+            summary=f"Updated team member {member_label}.",
+            old_values=old_values, new_values=new_values,
+        )
         return Response(UserSerializer(user).data)
 
     def post(self, request, pk):
@@ -174,6 +233,12 @@ class AgentDetailView(APIView):
         if action == 'toggle_status':
             user.is_active = not user.is_active
             user.save()
+            log_audit(
+                request, module='TEAM', action='TEAM_MEMBER_UPDATED',
+                record_type='User', record_id=user.id,
+                summary=f"{'Activated' if user.is_active else 'Deactivated'} team member {user.get_full_name() or user.username}.",
+                new_values={'is_active': user.is_active},
+            )
             return Response(UserSerializer(user).data)
 
         if action == 'reset_password':
@@ -182,6 +247,11 @@ class AgentDetailView(APIView):
                 return Response({'error': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
             user.set_password(password)
             user.save()
+            log_audit(
+                request, module='AUTH', action='PASSWORD_CHANGED',
+                record_type='User', record_id=user.id,
+                summary=f"Reset password for {user.get_full_name() or user.username}.",
+            )
             return Response({'success': True})
 
         return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
@@ -271,8 +341,15 @@ class CommissionSettingsView(APIView):
             return Response({'error': 'Rate must be between 0 and 100'}, status=status.HTTP_400_BAD_REQUEST)
 
         settings_obj = CommissionSettings.get_solo()
+        old_rate = settings_obj.global_rate
         settings_obj.global_rate = rate
         settings_obj.save()
+        log_audit(
+            request, module='SETTINGS', action='SETTINGS_UPDATED',
+            record_type='CommissionSettings', record_id=settings_obj.pk,
+            summary=f"Global commission rate changed from {old_rate}% to {rate}%.",
+            old_values={'globalRate': str(old_rate)}, new_values={'globalRate': str(rate)},
+        )
         return Response({
             'globalRate': str(settings_obj.global_rate),
             'updatedAt': settings_obj.updated_at.isoformat(),
@@ -295,8 +372,14 @@ class TeamPerformanceView(APIView):
             leads_qs = Lead.objects.filter(owner=agent)
             leads_claimed = leads_qs.count()
             conversions = leads_qs.filter(status='WON').count()
+            qualified = leads_qs.filter(status='QUALIFIED').count()
             revenue = float(
                 leads_qs.filter(status='WON').aggregate(total=Sum('value'))['total'] or Decimal('0.00')
+            )
+            commission_earned = float(
+                Commission.objects.filter(agent=agent, status__in=['APPROVED', 'PAID']).aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0.00')
             )
             calls = LeadActivity.objects.filter(
                 lead__owner=agent,
@@ -309,9 +392,11 @@ class TeamPerformanceView(APIView):
                 'agent': f"{agent.first_name} {agent.last_name}".strip() or agent.username,
                 'username': agent.username,
                 'leadsClaimed': leads_claimed,
+                'qualifiedLeads': qualified,
                 'calls': calls,
                 'conversions': conversions,
                 'revenue': revenue,
+                'commissionEarned': commission_earned,
                 'conversionRate': conversion_rate,
             })
 
@@ -428,8 +513,18 @@ class LeadViewSet(viewsets.ModelViewSet):
         if not user.is_authenticated:
             return Lead.objects.none()
         if user.profile.role == 'ADMIN':
-            return Lead.objects.all().order_by('-created_at')
-        return Lead.objects.filter(Q(owner=user) | Q(owner__isnull=True)).order_by('-created_at')
+            qs = Lead.objects.all()
+        else:
+            qs = Lead.objects.filter(Q(owner=user) | Q(owner__isnull=True))
+
+        search = (self.request.query_params.get('q') or self.request.query_params.get('search') or '').strip()
+        if search:
+            filters = Q(name__icontains=search) | Q(email__icontains=search) | Q(phone__icontains=search)
+            if search.isdigit():
+                filters |= Q(id=int(search))
+            qs = qs.filter(filters)
+
+        return qs.order_by('-created_at')
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -447,6 +542,12 @@ class LeadViewSet(viewsets.ModelViewSet):
             user=user,
             activity_type='CREATED',
             description=f"Lead created by {user.username}."
+        )
+        log_audit(
+            self.request, module='LEADS', action='LEAD_CREATED',
+            record_type='Lead', record_id=lead.id,
+            summary=f"Created lead '{lead.name}'.",
+            new_values={'name': lead.name, 'status': lead.status, 'owner': owner.username if owner else None},
         )
         if owner:
             create_notification(
@@ -486,6 +587,12 @@ class LeadViewSet(viewsets.ModelViewSet):
                 activity_type='STATUS_CHANGE',
                 description=f"Status changed from {old_status} to {updated_lead.status}."
             )
+            log_audit(
+                self.request, module='LEADS', action='LEAD_STATUS_CHANGED',
+                record_type='Lead', record_id=updated_lead.id,
+                summary=f"Lead '{updated_lead.name}' status changed from {old_status} to {updated_lead.status}.",
+                old_values={'status': old_status}, new_values={'status': updated_lead.status},
+            )
             
             # Handle automatic commissions on WON status asynchronously
             if updated_lead.status == 'WON':
@@ -504,6 +611,13 @@ class LeadViewSet(viewsets.ModelViewSet):
                 user=user,
                 activity_type='ASSIGNMENT',
                 description=f"Lead assigned to {owner_name}."
+            )
+            log_audit(
+                self.request, module='LEADS', action='LEAD_ASSIGNED',
+                record_type='Lead', record_id=updated_lead.id,
+                summary=f"Lead '{updated_lead.name}' assigned to {owner_name}.",
+                old_values={'owner': old_owner.username if old_owner else None},
+                new_values={'owner': updated_lead.owner.username if updated_lead.owner else None},
             )
             if updated_lead.owner:
                 create_notification(
@@ -538,6 +652,25 @@ class LeadViewSet(viewsets.ModelViewSet):
                 comm.amount = updated_lead.value * (comm.rate / Decimal('100.0'))
                 comm.save()
 
+        if changes:
+            log_audit(
+                self.request, module='LEADS', action='LEAD_UPDATED',
+                record_type='Lead', record_id=updated_lead.id,
+                summary=f"Updated lead '{updated_lead.name}': " + "; ".join(changes) + ".",
+                old_values={'status': old_status, 'value': str(old_value)},
+                new_values={'status': updated_lead.status, 'value': str(updated_lead.value)},
+            )
+
+    def perform_destroy(self, instance):
+        log_audit(
+            self.request, module='LEADS', action='LEAD_DELETED',
+            record_type='Lead', record_id=instance.id,
+            summary=f"Deleted lead '{instance.name}'.",
+            old_values={'name': instance.name, 'status': instance.status,
+                        'owner': instance.owner.username if instance.owner else None},
+        )
+        instance.delete()
+
     @action(detail=True, methods=['post'])
     def claim(self, request, pk=None):
         lead = self.get_object()
@@ -559,6 +692,12 @@ class LeadViewSet(viewsets.ModelViewSet):
             description=f"Lead claimed by {user.get_full_name() or user.username}."
         )
         claimer_name = user.get_full_name() or user.username
+        log_audit(
+            request, module='LEADS', action='LEAD_CLAIMED',
+            record_type='Lead', record_id=lead.id,
+            summary=f"{claimer_name} claimed lead '{lead.name}'.",
+            new_values={'owner': user.username},
+        )
 
         # Update the existing "New Lead Available" notifications in place so the
         # other agents keep the notification but see it as claimed (not removed).
@@ -712,10 +851,32 @@ class LeadFormViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         payload_fields = serializer.validated_data.get('form_fields')
-        serializer.save(
+        form = serializer.save(
             created_by=self.request.user,
             form_fields=payload_fields if payload_fields else default_form_fields()
         )
+        log_audit(
+            self.request, module='FORMS', action='FORM_CREATED',
+            record_type='LeadForm', record_id=form.id,
+            summary=f"Created form '{form.name}'.",
+            new_values={'name': form.name, 'is_active': form.is_active},
+        )
+
+    def perform_update(self, serializer):
+        form = serializer.save()
+        log_audit(
+            self.request, module='FORMS', action='FORM_UPDATED',
+            record_type='LeadForm', record_id=form.id,
+            summary=f"Updated form '{form.name}'.",
+        )
+
+    def perform_destroy(self, instance):
+        log_audit(
+            self.request, module='FORMS', action='FORM_DELETED',
+            record_type='LeadForm', record_id=instance.id,
+            summary=f"Deleted form '{instance.name}'.",
+        )
+        instance.delete()
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUserRole])
     def duplicate(self, request, pk=None):
@@ -915,6 +1076,13 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         task = serializer.save(created_by=self.request.user)
+        log_audit(
+            self.request, module='TASKS', action='TASK_CREATED',
+            record_type='Task', record_id=task.id,
+            summary=f"Created task '{task.title}' assigned to {task.assigned_to.username}.",
+            new_values={'title': task.title, 'status': task.status, 'priority': task.priority,
+                        'assigned_to': task.assigned_to.username},
+        )
         if task.lead:
             LeadActivity.objects.create(
                 lead=task.lead,
@@ -952,6 +1120,13 @@ class TaskViewSet(viewsets.ModelViewSet):
 
         if old_status != updated_task.status:
             record_task_history(updated_task, 'STATUS_CHANGED', old_status, updated_task.status, self.request.user)
+            log_audit(
+                self.request, module='TASKS',
+                action='TASK_COMPLETED' if updated_task.status == 'COMPLETED' else 'TASK_UPDATED',
+                record_type='Task', record_id=updated_task.id,
+                summary=f"Task '{updated_task.title}' status changed from {old_status} to {updated_task.status}.",
+                old_values={'status': old_status}, new_values={'status': updated_task.status},
+            )
             if updated_task.lead:
                 LeadActivity.objects.create(
                     lead=updated_task.lead,
@@ -973,6 +1148,14 @@ class TaskViewSet(viewsets.ModelViewSet):
                 lead=updated_task.lead,
                 task=updated_task
             )
+
+    def perform_destroy(self, instance):
+        log_audit(
+            self.request, module='TASKS', action='TASK_DELETED',
+            record_type='Task', record_id=instance.id,
+            summary=f"Deleted task '{instance.title}'.",
+        )
+        instance.delete()
 
     def get_queryset(self):
         user = self.request.user
@@ -1080,6 +1263,12 @@ class FollowUpViewSet(viewsets.ModelViewSet):
             followup.status = 'COMPLETED'
             followup.save(update_fields=['status'])
         record_followup_history(followup, 'CREATED', '', followup.scheduled_time.isoformat(), self.request.user)
+        log_audit(
+            self.request, module='FOLLOWUPS', action='FOLLOWUP_SCHEDULED',
+            record_type='FollowUp', record_id=followup.id,
+            summary=f"Scheduled {followup.get_followup_type_display()} follow-up for lead '{followup.lead.name}' at {followup.scheduled_time.strftime('%Y-%m-%d %H:%M')}.",
+            new_values={'type': followup.followup_type, 'scheduled_time': followup.scheduled_time.isoformat()},
+        )
         LeadActivity.objects.create(
             lead=followup.lead,
             user=self.request.user,
@@ -1132,6 +1321,13 @@ class FollowUpViewSet(viewsets.ModelViewSet):
 
         if old_status != updated.status:
             record_followup_history(updated, 'STATUS_CHANGED', old_status, updated.status, self.request.user)
+            log_audit(
+                self.request, module='FOLLOWUPS',
+                action='FOLLOWUP_COMPLETED' if updated.status == 'COMPLETED' else 'FOLLOWUP_UPDATED',
+                record_type='FollowUp', record_id=updated.id,
+                summary=f"Follow-up for lead '{updated.lead.name}' marked as {updated.status}.",
+                old_values={'status': old_status}, new_values={'status': updated.status},
+            )
             LeadActivity.objects.create(
                 lead=updated.lead,
                 user=self.request.user,
@@ -1181,6 +1377,12 @@ class FollowUpViewSet(viewsets.ModelViewSet):
             followup.notes = (followup.notes + '\n' if followup.notes else '') + completion_notes
         followup.save()
         record_followup_history(followup, 'STATUS_CHANGED', old_status, 'COMPLETED', request.user)
+        log_audit(
+            request, module='FOLLOWUPS', action='FOLLOWUP_COMPLETED',
+            record_type='FollowUp', record_id=followup.id,
+            summary=f"Completed follow-up for lead '{followup.lead.name}'.",
+            old_values={'status': old_status}, new_values={'status': 'COMPLETED'},
+        )
         LeadActivity.objects.create(
             lead=followup.lead,
             user=request.user,
@@ -1264,10 +1466,17 @@ class CommissionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUserRole])
     def approve(self, request, pk=None):
         comm = self.get_object()
+        old_status = comm.status
         comm.status = 'APPROVED'
         comm.approved_by = request.user
         comm.approved_at = timezone.now()
         comm.save()
+        log_audit(
+            request, module='COMMISSIONS', action='COMMISSION_UPDATED',
+            record_type='Commission', record_id=comm.id,
+            summary=f"Approved commission of ${comm.amount:.2f} for {comm.agent.username}.",
+            old_values={'status': old_status}, new_values={'status': 'APPROVED'},
+        )
         LeadActivity.objects.create(
             lead=comm.lead,
             user=request.user,
@@ -1296,8 +1505,15 @@ class CommissionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUserRole])
     def pay(self, request, pk=None):
         comm = self.get_object()
+        old_status = comm.status
         comm.status = 'PAID'
         comm.save()
+        log_audit(
+            request, module='COMMISSIONS', action='COMMISSION_UPDATED',
+            record_type='Commission', record_id=comm.id,
+            summary=f"Marked commission of ${comm.amount:.2f} for {comm.agent.username} as paid.",
+            old_values={'status': old_status}, new_values={'status': 'PAID'},
+        )
         LeadActivity.objects.create(
             lead=comm.lead,
             user=request.user,
@@ -1309,8 +1525,15 @@ class CommissionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUserRole])
     def reject(self, request, pk=None):
         comm = self.get_object()
+        old_status = comm.status
         comm.status = 'REJECTED'
         comm.save()
+        log_audit(
+            request, module='COMMISSIONS', action='COMMISSION_UPDATED',
+            record_type='Commission', record_id=comm.id,
+            summary=f"Rejected commission of ${comm.amount:.2f} for {comm.agent.username}.",
+            old_values={'status': old_status}, new_values={'status': 'REJECTED'},
+        )
         LeadActivity.objects.create(
             lead=comm.lead,
             user=request.user,
@@ -1333,6 +1556,8 @@ class DashboardStatsView(APIView):
         followups_qs = FollowUp.objects.all() if isAdmin else FollowUp.objects.filter(lead__owner=user)
 
         total_leads = leads_qs.count()
+        today = timezone.now().date()
+        month_start = today.replace(day=1)
         
         # Follow-ups pending
         pending_followups = followups_qs.filter(completed=False).count()
@@ -1342,6 +1567,11 @@ class DashboardStatsView(APIView):
 
         # Conversion rate
         won_leads = leads_qs.filter(status='WON').count()
+        active_leads = leads_qs.exclude(status__in=['WON', 'LOST']).count()
+        today_leads = leads_qs.filter(created_at__date=today).count()
+        revenue_this_month = float(
+            leads_qs.filter(status='WON', updated_at__date__gte=month_start).aggregate(total=Sum('value'))['total'] or Decimal('0.00')
+        )
         conversion_rate = (won_leads / total_leads * 100) if total_leads > 0 else 0.0
 
         # Status breakdown
@@ -1381,10 +1611,16 @@ class DashboardStatsView(APIView):
 
         return Response({
             'totalLeads': total_leads,
+            'activeLeads': active_leads,
+            'todayLeads': today_leads,
             'pendingFollowups': pending_followups,
+            'followupsDue': pending_followups,
             'earnedCommissions': float(earned_commissions),
+            'revenueThisMonth': revenue_this_month,
             'conversionRate': round(conversion_rate, 2),
             'pipelineValue': float(pipeline_value),
+            'wonDeals': won_leads,
+            'convertedLeads': won_leads,
             'statusBreakdown': status_map,
             'sourceBreakdown': {item['source']: item['count'] for item in source_breakdown},
             'totalImports': total_imports,
@@ -1403,13 +1639,12 @@ class DashboardChartsView(APIView):
         user = request.user
         isAdmin = user.profile.role == 'ADMIN'
 
-        # Leads over last 15 days
+        # Leads over last 30 days
         end_date = timezone.now().date()
-        start_date = end_date - datetime.timedelta(days=14)
+        start_date = end_date - datetime.timedelta(days=29)
 
         leads_qs = Lead.objects.all() if isAdmin else Lead.objects.filter(owner=user)
         
-        # Group by date
         daily_leads = leads_qs.filter(
             created_at__date__gte=start_date
         ).annotate(
@@ -1418,15 +1653,31 @@ class DashboardChartsView(APIView):
             count=Count('id')
         ).order_by('date')
 
-        # Fill in zero counts for missing dates
+        daily_won = leads_qs.filter(
+            status='WON',
+            updated_at__date__gte=start_date
+        ).annotate(
+            date=TruncDate('updated_at')
+        ).values('date').annotate(
+            count=Count('id'),
+            revenue=Sum('value')
+        ).order_by('date')
+
         daily_map = {item['date'].strftime('%Y-%m-%d'): item['count'] for item in daily_leads if item['date']}
+        converted_map = {item['date'].strftime('%Y-%m-%d'): item['count'] for item in daily_won if item['date']}
+        revenue_map = {
+            item['date'].strftime('%Y-%m-%d'): float(item['revenue'] or 0)
+            for item in daily_won if item['date']
+        }
         leads_timeline = []
         curr = start_date
         while curr <= end_date:
             date_str = curr.strftime('%Y-%m-%d')
             leads_timeline.append({
                 'date': curr.strftime('%b %d'),
-                'count': daily_map.get(date_str, 0)
+                'count': daily_map.get(date_str, 0),
+                'convertedCount': converted_map.get(date_str, 0),
+                'revenue': revenue_map.get(date_str, 0),
             })
             curr += datetime.timedelta(days=1)
 

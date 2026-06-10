@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Search, Bell, Plus, FileSpreadsheet, FileCode, ChevronDown } from 'lucide-react';
+import { Bell, Plus, FileSpreadsheet, FileCode, ChevronDown } from 'lucide-react';
 import { useAuthStore } from '../../store';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
+import { LeadSearchBar } from './LeadSearchBar';
 
 export const Header: React.FC = () => {
   const user = useAuthStore(state => state.user);
@@ -19,14 +20,7 @@ export const Header: React.FC = () => {
   return (
     <header className="min-h-[70px] border-b border-border/80 flex flex-col md:flex-row md:items-center justify-between gap-4 px-8 py-3 bg-card/45 backdrop-blur-xl sticky top-0 z-40">
       {/* Search Bar */}
-      <div className="relative w-full md:max-w-xs">
-        <Search size={15} className="absolute left-3 top-3 text-muted-foreground" />
-        <input 
-          type="text" 
-          placeholder="Search Lead" 
-          className="flex h-10 w-full rounded-lg border border-input bg-muted/20 pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-ring transition-all"
-        />
-      </div>
+      <LeadSearchBar />
 
       {/* Actions, Notifications & Profile */}
       <div className="flex flex-wrap items-center gap-3.5 ml-auto">

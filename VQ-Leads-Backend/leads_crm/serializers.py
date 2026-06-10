@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from .models import (
     UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, FollowUpHistory, Task,
     Commission, Notification, ImportHistory, ImportLog, ImportMappingTemplate, ExportHistory,
-    CallLog, LeadNote, LeadEmail, TaskComment, TaskHistory
+    CallLog, LeadNote, LeadEmail, TaskComment, TaskHistory, AuditLog
 )
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -390,3 +390,22 @@ class LeadEmailSerializer(serializers.ModelSerializer):
             'id', 'lead', 'lead_name', 'subject', 'sender', 'recipient', 'status',
             'direction', 'content', 'attachments', 'sent_at', 'created_at', 'updated_at'
         ]
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+    module_display = serializers.CharField(source='get_module_display', read_only=True)
+    device = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id', 'user', 'user_name', 'role', 'module', 'module_display',
+            'action', 'action_display', 'record_type', 'record_id', 'summary',
+            'old_values', 'new_values', 'ip_address', 'user_agent', 'device',
+            'created_at',
+        ]
+
+    def get_device(self, obj):
+        from .audit import parse_device
+        return parse_device(obj.user_agent)

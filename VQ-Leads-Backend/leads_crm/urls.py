@@ -19,6 +19,16 @@ from .reports_views import (
     ReportsDashboardWidgetsView, ReportsAnalyticsView,
     ReportsExportView, ReportsExportHistoryView
 )
+from .audit_views import (
+    AuditLogListView, AuditLogWidgetsView, AuditLogFiltersView, AuditLogExportView
+)
+from .settings_views import (
+    SettingsWidgetsView, GeneralSettingsView, GeneralSettingsResetView,
+    GeneralLogoUploadView, LeadSettingsView, LeadSettingsResetView,
+    CommissionSettingsModuleView, EmailSettingsView, EmailTestConnectionView,
+    NotificationSettingsView, ApiIntegrationsView, ApiIntegrationActionView,
+    SettingsAuditView,
+)
 
 router = DefaultRouter()
 router.register(r'leads', LeadViewSet, basename='lead')
@@ -74,6 +84,27 @@ urlpatterns = [
     path('reports/analytics/', ReportsAnalyticsView.as_view(), name='reports_analytics'),
     path('reports/export/', ReportsExportView.as_view(), name='reports_export'),
     path('reports/export-history/', ReportsExportHistoryView.as_view(), name='reports_export_history'),
+
+    # Audit logs endpoints
+    path('audit-logs/', AuditLogListView.as_view(), name='audit_logs'),
+    path('audit-logs/widgets/', AuditLogWidgetsView.as_view(), name='audit_logs_widgets'),
+    path('audit-logs/filters/', AuditLogFiltersView.as_view(), name='audit_logs_filters'),
+    path('audit-logs/export/', AuditLogExportView.as_view(), name='audit_logs_export'),
+
+    # Settings module endpoints
+    path('settings/widgets/', SettingsWidgetsView.as_view(), name='settings_widgets'),
+    path('settings/general/', GeneralSettingsView.as_view(), name='settings_general'),
+    path('settings/general/reset/', GeneralSettingsResetView.as_view(), name='settings_general_reset'),
+    path('settings/general/logo/', GeneralLogoUploadView.as_view(), name='settings_general_logo'),
+    path('settings/leads/', LeadSettingsView.as_view(), name='settings_leads'),
+    path('settings/leads/reset/', LeadSettingsResetView.as_view(), name='settings_leads_reset'),
+    path('settings/commission/', CommissionSettingsModuleView.as_view(), name='settings_commission'),
+    path('settings/email/', EmailSettingsView.as_view(), name='settings_email'),
+    path('settings/email/test/', EmailTestConnectionView.as_view(), name='settings_email_test'),
+    path('settings/notifications/', NotificationSettingsView.as_view(), name='settings_notifications'),
+    path('settings/api/', ApiIntegrationsView.as_view(), name='settings_api'),
+    path('settings/api/<str:service_name>/', ApiIntegrationActionView.as_view(), name='settings_api_action'),
+    path('settings/audit/', SettingsAuditView.as_view(), name='settings_audit'),
 
     # ViewSet Router
     path('', include(router.urls)),

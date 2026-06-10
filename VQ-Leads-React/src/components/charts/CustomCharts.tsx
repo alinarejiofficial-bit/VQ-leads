@@ -387,3 +387,123 @@ export const BarChart: React.FC<BarChartProps> = ({ data }) => {
     </div>
   );
 };
+
+/** Mini sparkline for KPI cards */
+export const Sparkline: React.FC<{ data: number[]; color?: string }> = ({ data, color = '#3b82f6' }) => {
+  const pts = data.length ? data : [0, 0, 0, 0];
+  const max = Math.max(...pts, 1);
+  const w = 64;
+  const h = 28;
+  const path = pts.map((v, i) => {
+    const x = (i / Math.max(pts.length - 1, 1)) * w;
+    const y = h - (v / max) * (h - 4) - 2;
+    return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+  }).join(' ');
+  return (
+    <svg width={w} height={h} className="opacity-80">
+      <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+};
+
+interface TrendPoint { date: string; count: number; revenue?: number }
+
+export const RevenueLeadsTrendChart: React.FC<{ data: TrendPoint[] }> = ({ data }) => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [width, setWidth] = React.useState(600);
+  const h = 220;
+  const pad = { t: 16, r: 16, b: 28, l: 40 };
+
+  React.useEffect(() => {
+    if (!ref.current) return;
+    const ro = new ResizeObserver(e => setWidth(e[0].contentRect.width || 600));
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
+
+  if (!data?.length) return <div className="py-16 text-center text-xs text-muted-foreground">No trend data</div>;
+
+  const maxLeads = Math.max(...data.map(d => d.count), 5);
+  const maxRev = Math.max(...data.map(d => d.revenue || 0), 1000);
+  const pts = data.map((d, i) => {
+    const x = pad.l + (i / Math.max(data.length - 1, 1)) * (width - pad.l - pad.r);
+    const yL = h - pad.b - (d.count / maxLeads) * (h - pad.t - pad.b);
+    const yR = h - pad.b - ((d.revenue || 0) / maxRev) * (h - pad.t - pad.b);
+    return { x, yL, yR, ...d };
+  });
+
+  const line = (key: 'yL' | 'yR') => pts.map((p, i) => `${i ? 'L' : 'M'} ${p.x} ${p[key]}`).join(' ');
+
+  return (
+    <div ref={ref} className="w-full">
+      <div className="mb-3 flex gap-4 text-xs text-slate-600">
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-blue-500" /> Revenue (USD)</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Leads</span>
+      </div>
+      <svg width="100%" height={h} viewBox={`0 0 ${width} ${h}`} preserveAspectRatio="none">
+        {[0, 0.25, 0.5, 0.75, 1].map((t, i) => {
+          const y = h - pad.b - t * (h - pad.t - pad.b);
+          return <line key={i} x1={pad.l} y1={y} x2={width - pad.r} y2={y} stroke="#e2e8f0" strokeDasharray="4 4" />;
+        })}
+        <path d={line('yR')} fill="none" stroke="#3b82f6" strokeWidth="2" />
+        <path d={line('yL')} fill="none" stroke="#22c55e" strokeWidth="2" />
+        {pts.filter((_, i) => i % 5 === 0).map((p, i) => (
+          <text key={i} x={p.x} y={h - 6} fill="#94a3b8" fontSize="9" textAnchor="middle">{p.date}</text>
+        ))}
+      </svg>
+    </div>
+  );
+};
+
+interface FunnelItem { label: string; value: number; color: string }
+
+export const PipelineFunnelChart: React.FC<{ data: FunnelItem[] }> = ({ data }) => {
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  return (
+    <div className="space-y-2">
+      {data.map(item => {
+        const pct = Math.round((item.value / total) * 100);
+        const w = 35 + pct * 0.65;
+        return (
+          <div key={item.label} className="flex items-center gap-2">
+            <span className="w-16 shrink-0 text-right text-xs text-slate-500">{item.label}</span>
+            <div className="flex flex-1 items-center">
+              <div
+                className="flex h-8 items-center justify-end rounded-md px-2 text-xs font-semibold text-white"
+                style={{ width: `${w}%`, minWidth: '45%', backgroundColor: item.color }}
+              >
+                {item.value} ({pct}%)
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+interface HBarItem { label: string; value: number; color?: string }
+
+export const SourceBarChart: React.FC<{ data: HBarItem[] }> = ({ data }) => {
+  if (!data.length) return <div className="py-8 text-center text-xs text-muted-foreground">No sources</div>;
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const colors = ['#3b82f6', '#22c55e', '#f97316', '#a855f7', '#ec4899', '#06b6d4'];
+  return (
+    <div className="space-y-3">
+      {data.map((item, i) => {
+        const pct = Math.round((item.value / total) * 100);
+        return (
+          <div key={item.label}>
+            <div className="mb-1 flex justify-between text-xs">
+              <span className="font-medium text-slate-700">{item.label}</span>
+              <span className="text-slate-500">{pct}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-100">
+              <div className="h-full rounded-full" style={{ width: `${Math.max(pct, 3)}%`, backgroundColor: item.color || colors[i % colors.length] }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};

@@ -6,10 +6,27 @@ from decimal import Decimal
 
 class CommissionSettings(models.Model):
     """Singleton storing the global commission configuration."""
+    COMMISSION_TYPE_CHOICES = [
+        ('PERCENTAGE', 'Percentage Based'),
+        ('FIXED', 'Fixed Amount'),
+        ('CUSTOM', 'Custom Rules'),
+    ]
+
     global_rate = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=Decimal('2.00')
+    )
+    commission_type = models.CharField(
+        max_length=20, choices=COMMISSION_TYPE_CHOICES, default='PERCENTAGE'
+    )
+    fixed_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    approval_required = models.BooleanField(default=True)
+    auto_calculation = models.BooleanField(default=True)
+    team_commission_enabled = models.BooleanField(default=False)
+    monthly_bonus_rules = models.TextField(blank=True, default='')
+    updated_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='commission_setting_updates'
     )
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -556,3 +573,177 @@ class Commission(models.Model):
 
     def __str__(self):
         return f"{self.agent.username} - {self.amount} ({self.status})"
+
+
+class AuditLog(models.Model):
+    """Immutable record of an important action performed in the system."""
+
+    MODULE_CHOICES = [
+        ('LEADS', 'Leads'),
+        ('TASKS', 'Tasks'),
+        ('FOLLOWUPS', 'Follow-ups'),
+        ('AUTH', 'Authentication'),
+        ('TEAM', 'Team'),
+        ('COMMISSIONS', 'Commissions'),
+        ('IMPORT', 'Import'),
+        ('EXPORT', 'Export'),
+        ('SETTINGS', 'Settings'),
+        ('FORMS', 'Forms'),
+        ('SYSTEM', 'System'),
+    ]
+
+    ACTION_CHOICES = [
+        ('LEAD_CREATED', 'Lead Created'),
+        ('LEAD_UPDATED', 'Lead Updated'),
+        ('LEAD_DELETED', 'Lead Deleted'),
+        ('LEAD_ASSIGNED', 'Lead Assigned'),
+        ('LEAD_STATUS_CHANGED', 'Lead Status Changed'),
+        ('LEAD_CLAIMED', 'Lead Claimed'),
+        ('TASK_CREATED', 'Task Created'),
+        ('TASK_UPDATED', 'Task Updated'),
+        ('TASK_COMPLETED', 'Task Completed'),
+        ('TASK_DELETED', 'Task Deleted'),
+        ('FOLLOWUP_SCHEDULED', 'Follow-up Scheduled'),
+        ('FOLLOWUP_UPDATED', 'Follow-up Updated'),
+        ('FOLLOWUP_COMPLETED', 'Follow-up Completed'),
+        ('USER_LOGIN', 'User Login'),
+        ('USER_LOGOUT', 'User Logout'),
+        ('LOGIN_FAILED', 'Failed Login Attempt'),
+        ('PASSWORD_CHANGED', 'Password Changed'),
+        ('PROFILE_UPDATED', 'Profile Updated'),
+        ('TEAM_MEMBER_ADDED', 'Team Member Added'),
+        ('TEAM_MEMBER_UPDATED', 'Team Member Updated'),
+        ('ROLE_CHANGED', 'Role Changed'),
+        ('COMMISSION_UPDATED', 'Commission Updated'),
+        ('IMPORT_PERFORMED', 'Import Performed'),
+        ('EXPORT_PERFORMED', 'Export Performed'),
+        ('SETTINGS_UPDATED', 'Settings Updated'),
+        ('FORM_CREATED', 'Form Created'),
+        ('FORM_UPDATED', 'Form Updated'),
+        ('FORM_DELETED', 'Form Deleted'),
+    ]
+
+    # user can be null when the action has no authenticated actor (e.g. failed login).
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs'
+    )
+    user_name = models.CharField(max_length=255, blank=True)
+    role = models.CharField(max_length=20, blank=True)
+    module = models.CharField(max_length=30, choices=MODULE_CHOICES, default='SYSTEM')
+    action = models.CharField(max_length=40, choices=ACTION_CHOICES)
+    record_type = models.CharField(max_length=60, blank=True)
+    record_id = models.CharField(max_length=60, blank=True)
+    summary = models.CharField(max_length=400, blank=True)
+    old_values = models.JSONField(default=dict, blank=True)
+    new_values = models.JSONField(default=dict, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['module']),
+            models.Index(fields=['action']),
+            models.Index(fields=['user']),
+        ]
+
+    def __str__(self):
+        return f"{self.created_at:%Y-%m-%d %H:%M} {self.user_name} {self.action}"
+
+
+class SystemSetting(models.Model):
+    """Flexible key-value store for grouped CRM configuration."""
+    setting_key = models.CharField(max_length=100, unique=True)
+    setting_value = models.JSONField(default=dict, blank=True)
+    updated_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='setting_updates'
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['setting_key']
+
+    def __str__(self):
+        return self.setting_key
+
+
+class EmailSettings(models.Model):
+    ENCRYPTION_CHOICES = [
+        ('NONE', 'None'),
+        ('SSL', 'SSL'),
+        ('TLS', 'TLS'),
+    ]
+
+    smtp_host = models.CharField(max_length=255, blank=True, default='')
+    smtp_port = models.PositiveIntegerField(default=587)
+    username = models.CharField(max_length=255, blank=True, default='')
+    password = models.CharField(max_length=255, blank=True, default='')
+    encryption = models.CharField(max_length=10, choices=ENCRYPTION_CHOICES, default='TLS')
+    sender_name = models.CharField(max_length=120, blank=True, default='')
+    sender_email = models.EmailField(blank=True, default='')
+    templates = models.JSONField(default=dict, blank=True)
+    automated_emails_enabled = models.BooleanField(default=True)
+    is_connected = models.BooleanField(default=False)
+    updated_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='email_setting_updates'
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Email Settings'
+        verbose_name_plural = 'Email Settings'
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return f"Email settings ({self.sender_email or 'not configured'})"
+
+
+class NotificationSetting(models.Model):
+    CHANNEL_CHOICES = [
+        ('IN_APP', 'In-App'),
+        ('EMAIL', 'Email'),
+        ('SMS', 'SMS'),
+        ('PUSH', 'Push Notifications'),
+    ]
+
+    notification_type = models.CharField(max_length=50)
+    channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES)
+    enabled = models.BooleanField(default=True)
+    reminder_minutes = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('notification_type', 'channel')
+        ordering = ['notification_type', 'channel']
+
+    def __str__(self):
+        return f"{self.notification_type} / {self.channel}"
+
+
+class ApiIntegration(models.Model):
+    STATUS_CHOICES = [
+        ('CONNECTED', 'Connected'),
+        ('PENDING', 'Pending'),
+        ('DISCONNECTED', 'Disconnected'),
+    ]
+
+    service_name = models.CharField(max_length=50, unique=True)
+    display_name = models.CharField(max_length=120, blank=True, default='')
+    api_key = models.CharField(max_length=500, blank=True, default='')
+    secret_key = models.CharField(max_length=500, blank=True, default='')
+    access_token = models.CharField(max_length=500, blank=True, default='')
+    webhook_url = models.URLField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DISCONNECTED')
+    connected_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['service_name']
+
+    def __str__(self):
+        return f"{self.service_name} ({self.status})"

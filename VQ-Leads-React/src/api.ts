@@ -200,9 +200,11 @@ export interface TeamPerformanceMember {
   agent: string;
   username: string;
   leadsClaimed: number;
+  qualifiedLeads?: number;
   calls: number;
   conversions: number;
   revenue: number;
+  commissionEarned?: number;
   conversionRate: number;
 }
 
@@ -405,6 +407,7 @@ export interface NotificationListResponse {
 
 export interface DashboardStats {
   totalLeads: number;
+  activeLeads?: number;
   availableLeads: number;
   assignedLeads: number;
   claimedLeads: number;
@@ -412,9 +415,12 @@ export interface DashboardStats {
   lostLeads: number;
   todayLeads: number;
   followupsDue: number;
+  pendingFollowups?: number;
   earnedCommissions: number;
+  revenueThisMonth?: number;
   conversionRate: number;
   pipelineValue: number;
+  wonDeals?: number;
   statusBreakdown: Record<string, number>;
   sourceBreakdown: Record<string, number>;
   totalImports: number;
@@ -527,6 +533,7 @@ export interface ChartTimelineItem {
   date: string;
   count: number;
   convertedCount?: number;
+  revenue?: number;
 }
 
 export interface LeaderboardItem {
@@ -785,6 +792,178 @@ function uploadFormData<T>(
   });
 }
 
+// Audit logs
+export interface AuditLog {
+  id: number;
+  user: number | null;
+  user_name: string;
+  role: string;
+  module: string;
+  module_display: string;
+  action: string;
+  action_display: string;
+  record_type: string;
+  record_id: string;
+  summary: string;
+  old_values: Record<string, unknown>;
+  new_values: Record<string, unknown>;
+  ip_address: string | null;
+  user_agent: string;
+  device: string;
+  created_at: string;
+}
+
+export interface AuditLogPage {
+  count: number;
+  page: number;
+  pageSize: number;
+  numPages: number;
+  results: AuditLog[];
+}
+
+export interface AuditLogWidgets {
+  totalActivities: number;
+  userLoginsToday: number;
+  failedLoginsToday: number;
+  systemChangesToday: number;
+  recentActivities: AuditLog[];
+}
+
+export interface AuditLogFilterOptions {
+  users: { id: number; name: string }[];
+  roles: string[];
+  modules: { value: string; label: string }[];
+  actions: { value: string; label: string }[];
+}
+
+export interface AuditLogQuery {
+  q?: string;
+  user?: string;
+  role?: string;
+  module?: string;
+  action?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+// Settings module
+export interface SettingsWidgets {
+  activeIntegrations: number;
+  pendingIntegrations: number;
+  emailStatus: 'connected' | 'disconnected';
+  notificationStatus: 'active' | 'inactive';
+  notificationsEnabled: number;
+  notificationsTotal: number;
+  apiUsage: number;
+  connectedServices: number;
+  lastConfigurationUpdate: string;
+}
+
+export interface GeneralSettings {
+  companyName: string;
+  companyLogo: string;
+  companyEmail: string;
+  companyPhone: string;
+  companyAddress: string;
+  websiteUrl: string;
+  timezone: string;
+  currency: string;
+  language: string;
+  dateFormat: string;
+  themeMode: 'light' | 'dark' | 'system';
+  sessionTimeoutMinutes: number;
+  twoFactorEnabled: boolean;
+  sessionManagementEnabled: boolean;
+}
+
+export interface LeadStatusConfig {
+  code: string;
+  label: string;
+  color: string;
+  isDefault?: boolean;
+}
+
+export interface LeadSourceConfig {
+  code: string;
+  label: string;
+}
+
+export interface LeadSettings {
+  statuses: LeadStatusConfig[];
+  sources: LeadSourceConfig[];
+  assignmentMode: 'MANUAL' | 'AUTO' | 'ROUND_ROBIN';
+  autoAssignment: boolean;
+  roundRobinEnabled: boolean;
+  duplicateDetection: boolean;
+  autoLeadNumber: boolean;
+  leadExpiryEnabled: boolean;
+  leadExpiryDays: number;
+}
+
+export interface CommissionModuleSettings {
+  globalRate: string;
+  commissionType: 'PERCENTAGE' | 'FIXED' | 'CUSTOM';
+  fixedAmount: string;
+  approvalRequired: boolean;
+  autoCalculation: boolean;
+  teamCommissionEnabled: boolean;
+  monthlyBonusRules: string;
+  updatedAt: string;
+}
+
+export interface EmailTemplateConfig {
+  subject: string;
+  body: string;
+  enabled: boolean;
+}
+
+export interface EmailSettingsData {
+  smtpHost: string;
+  smtpPort: number;
+  username: string;
+  password: string;
+  hasPassword: boolean;
+  encryption: 'NONE' | 'SSL' | 'TLS';
+  senderName: string;
+  senderEmail: string;
+  templates: Record<string, EmailTemplateConfig>;
+  automatedEmailsEnabled: boolean;
+  isConnected: boolean;
+  updatedAt: string;
+}
+
+export interface NotificationSettingItem {
+  notificationType: string;
+  label: string;
+  channel: 'IN_APP' | 'EMAIL' | 'SMS' | 'PUSH';
+  enabled: boolean;
+  reminderMinutes: number | null;
+}
+
+export interface NotificationSettingsData {
+  items: NotificationSettingItem[];
+  enabledCount: number;
+  totalCount: number;
+}
+
+export interface ApiIntegrationItem {
+  serviceName: string;
+  displayName: string;
+  apiKey: string;
+  secretKey: string;
+  accessToken: string;
+  webhookUrl: string;
+  status: 'CONNECTED' | 'PENDING' | 'DISCONNECTED';
+  connectedAt: string | null;
+  hasCredentials: boolean;
+}
+
+export interface ApiIntegrationsData {
+  integrations: ApiIntegrationItem[];
+}
+
 // API methods
 export const api = {
   // Auth
@@ -867,8 +1046,14 @@ export const api = {
   },
 
   // Leads
-  async getLeads(): Promise<Lead[]> {
-    return request<Lead[]>('/leads/');
+  async getLeads(params?: { q?: string }): Promise<Lead[]> {
+    const q = params?.q?.trim();
+    const suffix = q ? `?q=${encodeURIComponent(q)}` : '';
+    return request<Lead[]>(`/leads/${suffix}`);
+  },
+
+  async searchLeads(query: string): Promise<Lead[]> {
+    return this.getLeads({ q: query });
   },
 
   async getLead(id: number): Promise<Lead> {
@@ -1427,6 +1612,157 @@ export const api = {
   async getReportsExportHistory(search?: string): Promise<ExportHistoryItem[]> {
     const q = search ? `?reportOnly=true&search=${encodeURIComponent(search)}` : '?reportOnly=true';
     return request<ExportHistoryItem[]>(`/reports/export-history/${q}`);
+  },
+
+  // Audit logs
+  async getAuditLogs(query?: AuditLogQuery): Promise<AuditLogPage> {
+    const params = new URLSearchParams();
+    Object.entries(query || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
+    });
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return request<AuditLogPage>(`/audit-logs/${suffix}`);
+  },
+
+  async getAuditLogWidgets(): Promise<AuditLogWidgets> {
+    return request<AuditLogWidgets>('/audit-logs/widgets/');
+  },
+
+  async getAuditLogFilters(): Promise<AuditLogFilterOptions> {
+    return request<AuditLogFilterOptions>('/audit-logs/filters/');
+  },
+
+  async exportAuditLogs(fileType: 'csv' | 'xlsx' | 'pdf', filters?: AuditLogQuery): Promise<Blob> {
+    const token = localStorage.getItem('vq_token');
+    const response = await fetch(`${API_BASE}/audit-logs/export/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ fileType, filters: filters || {} }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to export audit logs');
+    }
+    return response.blob();
+  },
+
+  // Settings module
+  async getSettingsWidgets(): Promise<SettingsWidgets> {
+    return request<SettingsWidgets>('/settings/widgets/');
+  },
+
+  async getGeneralSettings(): Promise<GeneralSettings> {
+    return request<GeneralSettings>('/settings/general/');
+  },
+
+  async updateGeneralSettings(data: Partial<GeneralSettings>): Promise<GeneralSettings> {
+    return request<GeneralSettings>('/settings/general/', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async resetGeneralSettings(): Promise<GeneralSettings> {
+    return request<GeneralSettings>('/settings/general/reset/', { method: 'POST' });
+  },
+
+  async uploadCompanyLogo(file: File): Promise<{ companyLogo: string }> {
+    const form = new FormData();
+    form.append('logo', file);
+    const token = localStorage.getItem('vq_token');
+    const response = await fetch(`${API_BASE}/settings/general/logo/`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to upload logo');
+    }
+    return response.json();
+  },
+
+  async getLeadSettings(): Promise<LeadSettings> {
+    return request<LeadSettings>('/settings/leads/');
+  },
+
+  async updateLeadSettings(data: Partial<LeadSettings>): Promise<LeadSettings> {
+    return request<LeadSettings>('/settings/leads/', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async resetLeadSettings(): Promise<LeadSettings> {
+    return request<LeadSettings>('/settings/leads/reset/', { method: 'POST' });
+  },
+
+  async getCommissionModuleSettings(): Promise<CommissionModuleSettings> {
+    return request<CommissionModuleSettings>('/settings/commission/');
+  },
+
+  async updateCommissionModuleSettings(data: Partial<CommissionModuleSettings>): Promise<CommissionModuleSettings> {
+    return request<CommissionModuleSettings>('/settings/commission/', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getEmailSettings(): Promise<EmailSettingsData> {
+    return request<EmailSettingsData>('/settings/email/');
+  },
+
+  async updateEmailSettings(data: Partial<EmailSettingsData>): Promise<EmailSettingsData> {
+    return request<EmailSettingsData>('/settings/email/', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async testEmailConnection(data?: Partial<EmailSettingsData>): Promise<{ success: boolean; message: string; isConnected?: boolean }> {
+    return request('/settings/email/test/', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    });
+  },
+
+  async getNotificationSettings(): Promise<NotificationSettingsData> {
+    return request<NotificationSettingsData>('/settings/notifications/');
+  },
+
+  async updateNotificationSettings(items: NotificationSettingItem[]): Promise<NotificationSettingsData> {
+    return request<NotificationSettingsData>('/settings/notifications/', {
+      method: 'PATCH',
+      body: JSON.stringify({ items }),
+    });
+  },
+
+  async getApiIntegrations(): Promise<ApiIntegrationsData> {
+    return request<ApiIntegrationsData>('/settings/api/');
+  },
+
+  async updateApiIntegration(serviceName: string, data: Partial<ApiIntegrationItem>): Promise<ApiIntegrationsData> {
+    return request<ApiIntegrationsData>('/settings/api/', {
+      method: 'PATCH',
+      body: JSON.stringify({ serviceName, ...data }),
+    });
+  },
+
+  async apiIntegrationAction(
+    serviceName: string,
+    action: 'connect' | 'disconnect' | 'test'
+  ): Promise<Record<string, unknown>> {
+    return request(`/settings/api/${serviceName}/`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    });
+  },
+
+  async getSettingsAudit(): Promise<AuditLog[]> {
+    return request<AuditLog[]>('/settings/audit/');
   },
 
   // Dashboards

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api, type Lead, type LeadActivity, type Task, type FollowUp, type User } from '../../../api';
 import { Button } from '../../../components/forms/Button';
 import { Input } from '../../../components/forms/Input';
+import { OwnerLabel } from '../../../components/common/OwnerLabel';
 import { 
   X, 
   Calendar, 
@@ -435,7 +436,7 @@ export const LeadDetailsDrawer: React.FC<LeadDetailsDrawerProps> = ({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Owner</span>
-                      <span className="font-semibold text-foreground">{lead.owner_name || 'Unassigned'}</span>
+                      <span className="font-semibold"><OwnerLabel name={lead.owner_name} ownerId={lead.owner} /></span>
                     </div>
                   </div>
                 </div>
