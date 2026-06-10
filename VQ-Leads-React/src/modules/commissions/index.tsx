@@ -92,8 +92,10 @@ export const Commissions: React.FC<CommissionsProps> = ({ user }) => {
 
         <Card className="flex items-center justify-between p-6">
           <div className="flex flex-col text-left">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personal Rate</span>
-            <span className="text-3xl font-bold mt-2 text-foreground">{user.profile.commission_rate}%</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              {user.profile.commission_rate === null ? 'Global Rate' : 'Personal Rate'}
+            </span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{Number(user.profile.effective_commission_rate)}%</span>
           </div>
           <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center">
             <TrendingUp size={22} />

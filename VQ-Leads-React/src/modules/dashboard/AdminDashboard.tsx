@@ -16,7 +16,7 @@ export const AdminDashboard: React.FC = () => {
   const [agentEmail, setAgentEmail] = useState('');
   const [agentFirst, setAgentFirst] = useState('');
   const [agentLast, setAgentLast] = useState('');
-  const [agentComm, setAgentComm] = useState('10.00');
+  const [agentComm, setAgentComm] = useState('');
 
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
@@ -43,7 +43,7 @@ export const AdminDashboard: React.FC = () => {
       setAgentEmail('');
       setAgentFirst('');
       setAgentLast('');
-      setAgentComm('10.00');
+      setAgentComm('');
     },
     onError: (err: Error) => {
       alert(err.message || 'Failed to add agent');
@@ -184,7 +184,7 @@ export const AdminDashboard: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">{agent.full_name}</p>
-                  <p className="text-[10px] text-muted-foreground">@{agent.username} · {agent.profile.commission_rate}% comm.</p>
+                  <p className="text-[10px] text-muted-foreground">@{agent.username} · {Number(agent.profile.effective_commission_rate)}% comm.</p>
                 </div>
               </div>
             ))}
@@ -279,7 +279,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Commission Rate (%)</label>
-              <Input type="number" step="0.01" value={agentComm} onChange={e => setAgentComm(e.target.value)} />
+              <Input type="number" step="0.01" placeholder="Blank = global rate" value={agentComm} onChange={e => setAgentComm(e.target.value)} />
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-border/40">

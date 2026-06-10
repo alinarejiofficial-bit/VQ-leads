@@ -5,7 +5,7 @@ from .views import (
     SalesTeamViewSet, LeadFormViewSet, PublicFormDetailView,
     PublicFormSubmitView, TaskViewSet, FollowUpViewSet,
     CommissionViewSet, DashboardStatsView, DashboardChartsView, AgentDashboardView,
-    TeamPerformanceView,
+    TeamPerformanceView, CommissionSettingsView,
 )
 
 router = DefaultRouter()
@@ -36,6 +36,7 @@ urlpatterns = [
     path('dashboard/charts/', DashboardChartsView.as_view(), name='dashboard_charts'),
     path('dashboard/agent/', AgentDashboardView.as_view(), name='dashboard_agent'),
     path('team/performance/', TeamPerformanceView.as_view(), name='team_performance'),
+    path('commissions/settings/', CommissionSettingsView.as_view(), name='commission_settings'),
 
     # ViewSet Router
     path('', include(router.urls)),

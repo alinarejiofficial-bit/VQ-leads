@@ -3,9 +3,13 @@ from django.contrib.auth.models import User
 from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    effective_commission_rate = serializers.DecimalField(
+        max_digits=5, decimal_places=2, read_only=True
+    )
+
     class Meta:
         model = UserProfile
-        fields = ['role', 'commission_rate']
+        fields = ['role', 'commission_rate', 'effective_commission_rate']
 
 
 class UserSerializer(serializers.ModelSerializer):

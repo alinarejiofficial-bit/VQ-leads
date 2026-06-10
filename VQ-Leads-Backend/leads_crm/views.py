@@ -12,7 +12,7 @@ from django.utils import timezone
 from decimal import Decimal
 import datetime
 
-from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission
+from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission, CommissionSettings
 from .serializers import (
     UserSerializer, UserProfileSerializer, SalesTeamSerializer,
     LeadFormSerializer, LeadSerializer, LeadActivitySerializer,
@@ -84,7 +84,7 @@ class AgentsView(APIView):
         password = request.data.get('password')
         first_name = request.data.get('first_name', '')
         last_name = request.data.get('last_name', '')
-        commission_rate = request.data.get('commission_rate', '10.00')
+        commission_rate = request.data.get('commission_rate')
         role = request.data.get('role', 'AGENT')
         if role not in ('AGENT', 'LEADER'):
             role = 'AGENT'
@@ -106,7 +106,9 @@ class AgentsView(APIView):
         # Profile is created via post_save signal. We update its role & commission rate.
         profile = user.profile
         profile.role = role
-        profile.commission_rate = Decimal(str(commission_rate))
+        # Blank commission rate means the agent uses the global rate.
+        if commission_rate not in (None, ''):
+            profile.commission_rate = Decimal(str(commission_rate))
         profile.save()
 
         serializer = UserSerializer(user)
@@ -137,7 +139,8 @@ class AgentDetailView(APIView):
             user.profile.role = request.data['role']
             user.profile.save()
         if 'commission_rate' in request.data:
-            user.profile.commission_rate = Decimal(str(request.data['commission_rate']))
+            raw_rate = request.data['commission_rate']
+            user.profile.commission_rate = None if raw_rate in (None, '') else Decimal(str(raw_rate))
             user.profile.save()
         if 'is_active' in request.data:
             user.is_active = bool(request.data['is_active'])
@@ -224,6 +227,39 @@ class AgentTrackingView(APIView):
             })
 
         return Response(result)
+
+
+class CommissionSettingsView(APIView):
+    """Global commission configuration. Readable by any authenticated user, editable by admins."""
+
+    def get(self, request):
+        settings_obj = CommissionSettings.get_solo()
+        return Response({
+            'globalRate': str(settings_obj.global_rate),
+            'updatedAt': settings_obj.updated_at.isoformat(),
+        })
+
+    def patch(self, request):
+        if request.user.profile.role != 'ADMIN':
+            return Response({'error': 'Only admins can update commission settings'}, status=status.HTTP_403_FORBIDDEN)
+
+        raw_rate = request.data.get('globalRate')
+        if raw_rate in (None, ''):
+            return Response({'error': 'globalRate is required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            rate = Decimal(str(raw_rate))
+        except Exception:
+            return Response({'error': 'Invalid rate'}, status=status.HTTP_400_BAD_REQUEST)
+        if rate < 0 or rate > 100:
+            return Response({'error': 'Rate must be between 0 and 100'}, status=status.HTTP_400_BAD_REQUEST)
+
+        settings_obj = CommissionSettings.get_solo()
+        settings_obj.global_rate = rate
+        settings_obj.save()
+        return Response({
+            'globalRate': str(settings_obj.global_rate),
+            'updatedAt': settings_obj.updated_at.isoformat(),
+        })
 
 
 class TeamPerformanceView(APIView):

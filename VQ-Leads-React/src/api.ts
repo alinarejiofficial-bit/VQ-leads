@@ -3,7 +3,9 @@ export const API_BASE = 'http://localhost:8000/api';
 // Interfaces
 export interface UserProfile {
   role: 'ADMIN' | 'LEADER' | 'AGENT';
-  commission_rate: string;
+  // Null means the user follows the global commission rate.
+  commission_rate: string | null;
+  effective_commission_rate: string;
 }
 
 export interface User {
@@ -92,6 +94,11 @@ export interface AgentTrackingDetail {
     commissionEarned: number;
   };
   activities: LeadActivity[];
+}
+
+export interface CommissionSettings {
+  globalRate: string;
+  updatedAt: string;
 }
 
 export interface TeamPerformanceMember {
@@ -369,6 +376,17 @@ export const api = {
 
   async getTeamPerformance(): Promise<TeamPerformanceData> {
     return request<TeamPerformanceData>('/team/performance/');
+  },
+
+  async getCommissionSettings(): Promise<CommissionSettings> {
+    return request<CommissionSettings>('/commissions/settings/');
+  },
+
+  async updateCommissionSettings(globalRate: string): Promise<CommissionSettings> {
+    return request<CommissionSettings>('/commissions/settings/', {
+      method: 'PATCH',
+      body: JSON.stringify({ globalRate }),
+    });
   },
 
   // Leads

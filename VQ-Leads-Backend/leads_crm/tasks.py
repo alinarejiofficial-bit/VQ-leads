@@ -71,8 +71,9 @@ def calculate_commission_task(lead_id):
             logger.info(f"Commission already calculated for Lead {lead_id}.")
             return "Commission already exists."
 
-        # Calculate commission
-        rate = lead.owner.profile.commission_rate
+        # Commission = Lead Value x Commission Percentage
+        # Uses the agent's user-specific rate if set, otherwise the global rate.
+        rate = lead.owner.profile.effective_commission_rate
         amount = lead.value * (rate / Decimal('100.0'))
         
         Commission.objects.create(

@@ -10,6 +10,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '.
 import { Plus, Pencil, KeyRound, UserCheck, UserX } from 'lucide-react';
 import { RolesTab } from './RolesTab';
 import { PerformanceTab } from './PerformanceTab';
+import { CommissionTab } from './CommissionTab';
 import { ASSIGNABLE_MEMBER_ROLES, getRoleBadgeClass, getRoleLabel, type RoleId } from './rolesConfig';
 
 export const Teams: React.FC = () => {
@@ -30,14 +31,14 @@ export const Teams: React.FC = () => {
   const [agentEmail, setAgentEmail] = useState('');
   const [agentFirst, setAgentFirst] = useState('');
   const [agentLast, setAgentLast] = useState('');
-  const [agentComm, setAgentComm] = useState('10.00');
+  const [agentComm, setAgentComm] = useState('');
   const [agentRole, setAgentRole] = useState<RoleId>('AGENT');
 
   const [editingMember, setEditingMember] = useState<User | null>(null);
   const [editFirst, setEditFirst] = useState('');
   const [editLast, setEditLast] = useState('');
   const [editEmail, setEditEmail] = useState('');
-  const [editComm, setEditComm] = useState('10.00');
+  const [editComm, setEditComm] = useState('');
   const [editRole, setEditRole] = useState<RoleId>('AGENT');
 
   const [resetMember, setResetMember] = useState<User | null>(null);
@@ -82,7 +83,7 @@ export const Teams: React.FC = () => {
       setAgentEmail('');
       setAgentFirst('');
       setAgentLast('');
-      setAgentComm('10.00');
+      setAgentComm('');
       setAgentRole('AGENT');
     },
     onError: (err: Error) => {
@@ -150,7 +151,7 @@ export const Teams: React.FC = () => {
     setEditFirst(member.first_name);
     setEditLast(member.last_name);
     setEditEmail(member.email);
-    setEditComm(member.profile.commission_rate);
+    setEditComm(member.profile.commission_rate ?? '');
     setEditRole(member.profile.role === 'LEADER' ? 'LEADER' : 'AGENT');
   };
 
@@ -201,6 +202,7 @@ export const Teams: React.FC = () => {
           {[
             { id: 'members', label: 'Members', path: '/teams' },
             { id: 'roles', label: 'Roles', path: '/teams?tab=roles' },
+            { id: 'commission', label: 'Commission', path: '/teams?tab=commission' },
             { id: 'performance', label: 'Performance', path: '/teams?tab=performance' }
           ].map(t => (
             <a key={t.id} href={t.path} className={`pb-4 -mb-4 px-2 text-sm font-medium ${tab === t.id ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}>
@@ -260,7 +262,12 @@ export const Teams: React.FC = () => {
                             {getRoleLabel(member.profile.role)}
                           </span>
                         </TableCell>
-                        <TableCell>{member.profile.commission_rate}%</TableCell>
+                        <TableCell>
+                          {Number(member.profile.effective_commission_rate)}%
+                          {member.profile.commission_rate === null && (
+                            <span className="ml-1.5 text-[9px] font-bold text-muted-foreground uppercase">(Global)</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
                             member.is_active !== false
@@ -367,6 +374,8 @@ export const Teams: React.FC = () => {
 
       {tab === 'roles' && <RolesTab members={agents} />}
 
+      {tab === 'commission' && <CommissionTab members={agents} />}
+
       {tab === 'performance' && <PerformanceTab />}
 
       {/* Create Team Modal */}
@@ -450,7 +459,7 @@ export const Teams: React.FC = () => {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Commission Rate (%)</label>
-              <Input type="number" step="0.01" value={agentComm} onChange={e => setAgentComm(e.target.value)} />
+              <Input type="number" step="0.01" placeholder="Blank = global rate" value={agentComm} onChange={e => setAgentComm(e.target.value)} />
             </div>
           </div>
           <div className="flex flex-col gap-1">
@@ -498,7 +507,7 @@ export const Teams: React.FC = () => {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Commission Rate (%)</label>
-              <Input type="number" step="0.01" value={editComm} onChange={e => setEditComm(e.target.value)} />
+              <Input type="number" step="0.01" placeholder="Blank = global rate" value={editComm} onChange={e => setEditComm(e.target.value)} />
             </div>
           </div>
           <div className="flex flex-col gap-1">

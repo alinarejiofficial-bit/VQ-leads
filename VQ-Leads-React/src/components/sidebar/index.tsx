@@ -123,6 +123,7 @@ export const Sidebar: React.FC = () => {
       children: [
         { label: 'Members', path: '/teams' },
         { label: 'Roles', path: '/teams?tab=roles' },
+        { label: 'Commission', path: '/teams?tab=commission' },
         { label: 'Performance', path: '/teams?tab=performance' },
       ]
     },

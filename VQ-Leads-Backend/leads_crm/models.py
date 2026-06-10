@@ -4,6 +4,28 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from decimal import Decimal
 
+class CommissionSettings(models.Model):
+    """Singleton storing the global commission configuration."""
+    global_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('2.00')
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Commission Settings'
+        verbose_name_plural = 'Commission Settings'
+
+    def __str__(self):
+        return f"Global commission rate: {self.global_rate}%"
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(
@@ -11,14 +33,23 @@ class UserProfile(models.Model):
         choices=[('ADMIN', 'Admin'), ('LEADER', 'Team Leader'), ('AGENT', 'Agent')],
         default='AGENT'
     )
+    # Null means "use the global commission rate"; a value is a user-specific override.
     commission_rate = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        default=Decimal('10.00')
+        null=True,
+        blank=True,
+        default=None
     )
 
     def __str__(self):
         return f"{self.user.username} ({self.role})"
+
+    @property
+    def effective_commission_rate(self):
+        if self.commission_rate is not None:
+            return self.commission_rate
+        return CommissionSettings.get_solo().global_rate
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
