@@ -28,6 +28,16 @@ export const FollowUpsList: React.FC = () => {
     toggleFollowupMutation.mutate({ id: f.id, completed: !f.completed });
   };
 
+  const handleReschedule = (f: FollowUp) => {
+    if (!f.scheduled_time) return;
+    const next = new Date(f.scheduled_time);
+    next.setDate(next.getDate() + 1);
+    toggleFollowupMutation.mutate({ id: f.id, completed: false });
+    api.updateFollowUp(f.id, { scheduled_time: next.toISOString() }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['followups'] });
+    });
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No due date';
     return new Date(dateString).toLocaleString([], {
@@ -95,10 +105,29 @@ export const FollowUpsList: React.FC = () => {
                   <span className="bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded font-semibold border border-blue-500/15">
                     Lead: {f.lead_name}
                   </span>
+                  <span className="bg-violet-500/10 text-violet-400 px-1.5 py-0.5 rounded font-semibold border border-violet-500/15">
+                    {f.followup_type || 'CALL'}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded font-semibold border ${
+                    f.status === 'OVERDUE'
+                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                      : f.status === 'COMPLETED'
+                        ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                        : 'bg-muted/30 text-muted-foreground border-border/30'
+                  }`}>
+                    {f.status || (f.completed ? 'COMPLETED' : 'PENDING')}
+                  </span>
                   <span className="flex items-center gap-1">
                     <Calendar size={10} /> {formatDate(f.scheduled_time)}
                   </span>
                 </div>
+                <button
+                  type="button"
+                  className="mt-2 text-[10px] text-primary hover:underline text-left"
+                  onClick={() => handleReschedule(f)}
+                >
+                  Reschedule +1 day
+                </button>
               </div>
             </div>
           ))

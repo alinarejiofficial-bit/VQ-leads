@@ -71,6 +71,69 @@ export interface LeadActivity {
   created_at: string;
 }
 
+export interface ActivityTimelineResponse {
+  results: LeadActivity[];
+  page: number;
+  page_size: number;
+  total: number;
+  has_next: boolean;
+}
+
+export interface CallLog {
+  id: number;
+  lead: number;
+  lead_name: string;
+  agent: number;
+  agent_name: string;
+  call_date: string;
+  duration: number;
+  call_type: 'INCOMING' | 'OUTGOING';
+  call_status: 'ANSWERED' | 'MISSED' | 'BUSY' | 'NO_RESPONSE';
+  outcome: 'INTERESTED' | 'NOT_INTERESTED' | 'CALLBACK_REQUESTED' | 'CONVERTED' | '';
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeadNote {
+  id: number;
+  lead: number;
+  lead_name: string;
+  title: string;
+  content: string;
+  is_pinned: boolean;
+  created_by: number;
+  created_by_name: string;
+  mention_user_ids?: number[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeadEmail {
+  id: number;
+  lead: number;
+  lead_name: string;
+  subject: string;
+  sender: string;
+  recipient: string;
+  status: 'DRAFT' | 'SENT' | 'DELIVERED' | 'OPENED' | 'FAILED';
+  direction: 'SENT' | 'RECEIVED';
+  content: string;
+  attachments: string;
+  sent_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ActivityWidgetStats {
+  totalActivities: number;
+  callsMadeToday: number;
+  notesAddedToday: number;
+  emailsSentToday: number;
+  pendingFollowUps: number;
+  overdueFollowUps: number;
+}
+
 export interface AgentTrackingStats {
   totalLeads: number;
   wonLeads: number;
@@ -141,8 +204,12 @@ export interface FollowUp {
   scheduled_time: string;
   notes: string;
   completed: boolean;
+  status?: 'PENDING' | 'COMPLETED' | 'OVERDUE';
+  followup_type?: 'CALL' | 'MEETING' | 'EMAIL' | 'WHATSAPP';
   created_by: number;
   created_by_name: string;
+  assigned_agent?: number | null;
+  assigned_agent_details?: User | null;
   created_at: string;
 }
 
@@ -609,6 +676,24 @@ export const api = {
     return request<LeadActivity[]>(`/leads/${id}/activities/`);
   },
 
+  async getActivitiesTimeline(params?: {
+    activity_type?: string;
+    agent?: number;
+    lead?: number;
+    date_from?: string;
+    date_to?: string;
+    status?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<ActivityTimelineResponse> {
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
+    });
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<ActivityTimelineResponse>(`/activities/timeline/${suffix}`);
+  },
+
   // Teams
   async getTeams(): Promise<SalesTeam[]> {
     return request<SalesTeam[]>('/teams/');
@@ -725,6 +810,66 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(followup),
     });
+  },
+
+  // Activities module entities
+  async getCallLogs(params?: { q?: string; lead?: number; agent?: number; call_status?: string; date_from?: string; date_to?: string }): Promise<CallLog[]> {
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
+    });
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<CallLog[]>(`/call-logs/${suffix}`);
+  },
+
+  async createCallLog(payload: Partial<CallLog>): Promise<CallLog> {
+    return request<CallLog>('/call-logs/', { method: 'POST', body: JSON.stringify(payload) });
+  },
+
+  async updateCallLog(id: number, payload: Partial<CallLog>): Promise<CallLog> {
+    return request<CallLog>(`/call-logs/${id}/`, { method: 'PATCH', body: JSON.stringify(payload) });
+  },
+
+  async getNotes(params?: { lead?: number; created_by?: number; pinned?: boolean }): Promise<LeadNote[]> {
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) query.set(k, String(v));
+    });
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<LeadNote[]>(`/notes/${suffix}`);
+  },
+
+  async createNote(payload: Partial<LeadNote>): Promise<LeadNote> {
+    return request<LeadNote>('/notes/', { method: 'POST', body: JSON.stringify(payload) });
+  },
+
+  async updateNote(id: number, payload: Partial<LeadNote>): Promise<LeadNote> {
+    return request<LeadNote>(`/notes/${id}/`, { method: 'PATCH', body: JSON.stringify(payload) });
+  },
+
+  async deleteNote(id: number): Promise<void> {
+    return request<void>(`/notes/${id}/`, { method: 'DELETE' });
+  },
+
+  async getEmails(params?: { lead?: number; direction?: string; status?: string }): Promise<LeadEmail[]> {
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
+    });
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<LeadEmail[]>(`/emails/${suffix}`);
+  },
+
+  async createEmail(payload: Partial<LeadEmail>): Promise<LeadEmail> {
+    return request<LeadEmail>('/emails/', { method: 'POST', body: JSON.stringify(payload) });
+  },
+
+  async updateEmail(id: number, payload: Partial<LeadEmail>): Promise<LeadEmail> {
+    return request<LeadEmail>(`/emails/${id}/`, { method: 'PATCH', body: JSON.stringify(payload) });
+  },
+
+  async getActivityWidgetStats(): Promise<ActivityWidgetStats> {
+    return request<ActivityWidgetStats>('/activities/widgets/');
   },
 
   // Commissions
