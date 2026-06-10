@@ -195,6 +195,35 @@ class Task(models.Model):
         return self.title
 
 
+class Notification(models.Model):
+    TYPE_CHOICES = [
+        ('NEW_LEAD_AVAILABLE', 'New Lead Available'),
+        ('LEAD_ASSIGNED', 'Lead Assigned'),
+        ('LEAD_CLAIMED', 'Lead Claimed'),
+        ('TASK_ASSIGNED', 'Task Assigned'),
+        ('FOLLOWUP_REMINDER', 'Follow-up Reminder'),
+        ('CONVERSION_APPROVED', 'Conversion Approved'),
+        ('COMMISSION_APPROVED', 'Commission Approved'),
+    ]
+
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    type = models.CharField(max_length=40, choices=TYPE_CHOICES)
+    title = models.CharField(max_length=180)
+    message = models.TextField()
+    lead = models.ForeignKey(Lead, null=True, blank=True, on_delete=models.SET_NULL, related_name='notifications')
+    task = models.ForeignKey(Task, null=True, blank=True, on_delete=models.SET_NULL, related_name='notifications')
+    commission = models.ForeignKey('Commission', null=True, blank=True, on_delete=models.SET_NULL, related_name='notifications')
+    is_read = models.BooleanField(default=False)
+    is_archived = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.recipient.username}: {self.title}"
+
+
 class Commission(models.Model):
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),

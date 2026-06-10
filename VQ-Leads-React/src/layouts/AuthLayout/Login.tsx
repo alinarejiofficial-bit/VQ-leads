@@ -5,7 +5,7 @@ import { api } from '../../api';
 import { useAuthStore } from '../../store';
 import { Button } from '../../components/forms/Button';
 import { Input } from '../../components/forms/Input';
-import { Shield, Users, ArrowRight } from 'lucide-react';
+import { Shield, Users, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [roleTab, setRoleTab] = useState<'agent' | 'admin'>('agent');
@@ -13,6 +13,8 @@ export const Login: React.FC = () => {
   const [adminPassword, setAdminPassword] = useState('admin123');
   const [agentUsername, setAgentUsername] = useState('agent1');
   const [agentPassword, setAgentPassword] = useState('agent123');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [showAgentPassword, setShowAgentPassword] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const login = useAuthStore(state => state.login);
@@ -50,15 +52,8 @@ export const Login: React.FC = () => {
     loginMutation.mutate();
   };
 
-  const handleQuickLogin = async (userStr: string, passStr: string) => {
-    setError('');
-    try {
-      const data = await api.login(userStr, passStr);
-      login(data.user, data.token);
-      navigate('/dashboard');
-    } catch (err) {
-      setError('Quick login failed');
-    }
+  const handleForgotPassword = () => {
+    alert('Please contact your administrator to reset your password.');
   };
 
   return (
@@ -140,13 +135,23 @@ export const Login: React.FC = () => {
 
             <div className="flex flex-col gap-1.5 text-left">
               <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
-              <Input 
-                type="password" 
-                value={adminPassword} 
-                onChange={e => setAdminPassword(e.target.value)} 
-                required 
-                className="bg-card/50 focus:bg-card hover:border-border/80 transition-all text-sm h-11"
-              />
+              <div className="relative">
+                <Input
+                  type={showAdminPassword ? 'text' : 'password'}
+                  value={adminPassword}
+                  onChange={e => setAdminPassword(e.target.value)}
+                  required
+                  className="bg-card/50 focus:bg-card hover:border-border/80 transition-all text-sm h-11 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAdminPassword(prev => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showAdminPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showAdminPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -165,15 +170,14 @@ export const Login: React.FC = () => {
             </Button>
           </form>
 
-          {/* Quick Pre-fills & Mobile-only Switch */}
+          {/* Footer actions */}
           <div className="mt-6 border-t border-border/40 pt-4 flex flex-col gap-3">
-            <button 
+            <button
               type="button"
-              className="flex justify-between items-center text-left text-xs bg-secondary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary border border-border/40 hover:border-primary/20 p-2.5 rounded-xl transition-all duration-300 cursor-pointer"
-              onClick={() => handleQuickLogin('admin', 'admin123')}
+              onClick={handleForgotPassword}
+              className="text-xs text-primary font-bold hover:underline text-left cursor-pointer"
             >
-              <span className="font-bold text-foreground">Sarah Conner (Admin)</span>
-              <span className="opacity-70 font-mono text-[10px] bg-secondary/80 px-2 py-0.5 rounded-md border border-border/60">admin</span>
+              Forgot Password?
             </button>
             <button 
               type="button"
@@ -212,13 +216,23 @@ export const Login: React.FC = () => {
 
             <div className="flex flex-col gap-1.5 text-left">
               <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
-              <Input 
-                type="password" 
-                value={agentPassword} 
-                onChange={e => setAgentPassword(e.target.value)} 
-                required 
-                className="bg-card/50 focus:bg-card hover:border-border/80 transition-all text-sm h-11"
-              />
+              <div className="relative">
+                <Input
+                  type={showAgentPassword ? 'text' : 'password'}
+                  value={agentPassword}
+                  onChange={e => setAgentPassword(e.target.value)}
+                  required
+                  className="bg-card/50 focus:bg-card hover:border-border/80 transition-all text-sm h-11 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAgentPassword(prev => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showAgentPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showAgentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -237,26 +251,15 @@ export const Login: React.FC = () => {
             </Button>
           </form>
 
-          {/* Quick Demo Pre-fills & Mobile-only Switch */}
+          {/* Footer actions */}
           <div className="mt-6 border-t border-border/40 pt-4 flex flex-col gap-2">
-            <div className="flex flex-col gap-2">
-              <button 
-                type="button"
-                className="flex justify-between items-center text-left text-xs bg-secondary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary border border-border/40 hover:border-primary/20 p-2.5 rounded-xl transition-all duration-300 cursor-pointer"
-                onClick={() => handleQuickLogin('agent1', 'agent123')}
-              >
-                <span className="font-bold text-foreground">Alice Smith (Agent)</span>
-                <span className="opacity-70 font-mono text-[9px] bg-secondary/80 px-2 py-0.5 rounded-md border border-border/60">agent1</span>
-              </button>
-              <button 
-                type="button"
-                className="flex justify-between items-center text-left text-xs bg-secondary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary border border-border/40 hover:border-primary/20 p-2.5 rounded-xl transition-all duration-300 cursor-pointer"
-                onClick={() => handleQuickLogin('agent2', 'agent123')}
-              >
-                <span className="font-bold text-foreground">Bob Jones (Agent)</span>
-                <span className="opacity-70 font-mono text-[9px] bg-secondary/80 px-2 py-0.5 rounded-md border border-border/60">agent2</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              className="text-xs text-primary font-bold hover:underline text-left cursor-pointer"
+            >
+              Forgot Password?
+            </button>
             <button 
               type="button"
               className="md:hidden text-xs text-primary font-bold hover:underline text-center mt-3 cursor-pointer"

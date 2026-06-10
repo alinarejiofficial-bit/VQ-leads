@@ -177,6 +177,36 @@ export interface Commission {
   approved_by_name: string;
 }
 
+export type NotificationType =
+  | 'NEW_LEAD_AVAILABLE'
+  | 'LEAD_ASSIGNED'
+  | 'LEAD_CLAIMED'
+  | 'TASK_ASSIGNED'
+  | 'FOLLOWUP_REMINDER'
+  | 'CONVERSION_APPROVED'
+  | 'COMMISSION_APPROVED';
+
+export interface NotificationItem {
+  id: number;
+  type: NotificationType;
+  title: string;
+  message: string;
+  is_read: boolean;
+  is_archived: boolean;
+  created_at: string;
+  lead: number | null;
+  lead_name: string;
+  task: number | null;
+  task_title: string;
+  commission: number | null;
+  commission_amount: string;
+}
+
+export interface NotificationListResponse {
+  items: NotificationItem[];
+  unreadCount: number;
+}
+
 export interface DashboardStats {
   totalLeads: number;
   availableLeads: number;
@@ -574,6 +604,31 @@ export const api = {
     return request<Commission>(`/commissions/${id}/reject/`, {
       method: 'POST',
     });
+  },
+
+  // Notifications
+  async getNotifications(params?: { archived?: boolean; unread?: boolean }): Promise<NotificationListResponse> {
+    const query = new URLSearchParams();
+    if (params?.archived !== undefined) query.set('archived', String(params.archived));
+    if (params?.unread !== undefined) query.set('unread', String(params.unread));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<NotificationListResponse>(`/notifications/${suffix}`);
+  },
+
+  async markNotificationRead(id: number): Promise<NotificationItem> {
+    return request<NotificationItem>(`/notifications/${id}/read/`, { method: 'POST' });
+  },
+
+  async markNotificationUnread(id: number): Promise<NotificationItem> {
+    return request<NotificationItem>(`/notifications/${id}/unread/`, { method: 'POST' });
+  },
+
+  async archiveNotification(id: number): Promise<NotificationItem> {
+    return request<NotificationItem>(`/notifications/${id}/archive/`, { method: 'POST' });
+  },
+
+  async markAllNotificationsRead(): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>('/notifications/mark_all_read/', { method: 'POST' });
   },
 
   // Dashboards

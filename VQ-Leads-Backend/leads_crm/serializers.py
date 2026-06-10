@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission
+from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission, Notification
 
 class UserProfileSerializer(serializers.ModelSerializer):
     effective_commission_rate = serializers.DecimalField(
@@ -138,3 +138,25 @@ class CommissionSerializer(serializers.ModelSerializer):
             name = f"{obj.approved_by.first_name} {obj.approved_by.last_name}".strip()
             return name if name else obj.approved_by.username
         return ""
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    lead_name = serializers.SerializerMethodField()
+    task_title = serializers.SerializerMethodField()
+    commission_amount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'type', 'title', 'message', 'is_read', 'is_archived', 'created_at',
+            'lead', 'lead_name', 'task', 'task_title', 'commission', 'commission_amount'
+        ]
+
+    def get_lead_name(self, obj):
+        return obj.lead.name if obj.lead else ''
+
+    def get_task_title(self, obj):
+        return obj.task.title if obj.task else ''
+
+    def get_commission_amount(self, obj):
+        return str(obj.commission.amount) if obj.commission else ''

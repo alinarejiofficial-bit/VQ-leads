@@ -12,11 +12,11 @@ from django.utils import timezone
 from decimal import Decimal
 import datetime
 
-from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission, CommissionSettings
+from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission, CommissionSettings, Notification
 from .serializers import (
     UserSerializer, UserProfileSerializer, SalesTeamSerializer,
     LeadFormSerializer, LeadSerializer, LeadActivitySerializer,
-    FollowUpSerializer, TaskSerializer, CommissionSerializer
+    FollowUpSerializer, TaskSerializer, CommissionSerializer, NotificationSerializer
 )
 
 # Custom Permissions
@@ -30,6 +30,20 @@ class IsAdminOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return request.user.is_authenticated
         return request.user.is_authenticated and hasattr(request.user, 'profile') and request.user.profile.role == 'ADMIN'
+
+
+def create_notification(recipient, notif_type, title, message, lead=None, task=None, commission=None):
+    if not recipient or not recipient.is_active:
+        return None
+    return Notification.objects.create(
+        recipient=recipient,
+        type=notif_type,
+        title=title,
+        message=message,
+        lead=lead,
+        task=task,
+        commission=commission,
+    )
 
 
 # Auth Views
@@ -340,6 +354,68 @@ class TeamPerformanceView(APIView):
         })
 
 
+class NotificationViewSet(viewsets.ModelViewSet):
+    serializer_class = NotificationSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return Notification.objects.none()
+        qs = Notification.objects.filter(recipient=user).order_by('-created_at')
+        archived = self.request.query_params.get('archived')
+        unread = self.request.query_params.get('unread')
+        if archived == 'true':
+            qs = qs.filter(is_archived=True)
+        elif archived == 'false':
+            qs = qs.filter(is_archived=False)
+        if unread == 'true':
+            qs = qs.filter(is_read=False)
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        unread_count = Notification.objects.filter(
+            recipient=request.user,
+            is_read=False,
+            is_archived=False
+        ).count()
+        return Response({
+            'items': serializer.data,
+            'unreadCount': unread_count,
+        })
+
+    @action(detail=True, methods=['post'])
+    def read(self, request, pk=None):
+        notif = self.get_object()
+        notif.is_read = True
+        notif.save(update_fields=['is_read'])
+        return Response(NotificationSerializer(notif).data)
+
+    @action(detail=True, methods=['post'])
+    def unread(self, request, pk=None):
+        notif = self.get_object()
+        notif.is_read = False
+        notif.save(update_fields=['is_read'])
+        return Response(NotificationSerializer(notif).data)
+
+    @action(detail=True, methods=['post'])
+    def archive(self, request, pk=None):
+        notif = self.get_object()
+        notif.is_archived = True
+        notif.save(update_fields=['is_archived'])
+        return Response(NotificationSerializer(notif).data)
+
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        Notification.objects.filter(
+            recipient=request.user,
+            is_read=False,
+            is_archived=False
+        ).update(is_read=True)
+        return Response({'success': True})
+
+
 # Lead ViewSet
 class LeadViewSet(viewsets.ModelViewSet):
     serializer_class = LeadSerializer
@@ -369,6 +445,24 @@ class LeadViewSet(viewsets.ModelViewSet):
             activity_type='CREATED',
             description=f"Lead created by {user.username}."
         )
+        if owner:
+            create_notification(
+                recipient=owner,
+                notif_type='LEAD_ASSIGNED',
+                title='Lead Assigned',
+                message=f"You were assigned lead {lead.name}.",
+                lead=lead
+            )
+        else:
+            recipients = User.objects.filter(profile__role__in=['AGENT', 'LEADER'], is_active=True)
+            for recipient in recipients:
+                create_notification(
+                    recipient=recipient,
+                    notif_type='NEW_LEAD_AVAILABLE',
+                    title='New Lead Available',
+                    message=f"A new unassigned lead ({lead.name}) is available to claim.",
+                    lead=lead
+                )
 
     def perform_update(self, serializer):
         lead = self.get_object()
@@ -408,6 +502,24 @@ class LeadViewSet(viewsets.ModelViewSet):
                 activity_type='ASSIGNMENT',
                 description=f"Lead assigned to {owner_name}."
             )
+            if updated_lead.owner:
+                create_notification(
+                    recipient=updated_lead.owner,
+                    notif_type='LEAD_ASSIGNED',
+                    title='Lead Assigned',
+                    message=f"You were assigned lead {updated_lead.name}.",
+                    lead=updated_lead
+                )
+            else:
+                recipients = User.objects.filter(profile__role__in=['AGENT', 'LEADER'], is_active=True)
+                for recipient in recipients:
+                    create_notification(
+                        recipient=recipient,
+                        notif_type='NEW_LEAD_AVAILABLE',
+                        title='New Lead Available',
+                        message=f"Lead {updated_lead.name} is now available to claim.",
+                        lead=updated_lead
+                    )
 
         if old_value != updated_lead.value:
             changes.append(f"value updated to ${updated_lead.value}")
@@ -437,6 +549,21 @@ class LeadViewSet(viewsets.ModelViewSet):
             activity_type='CLAIM',
             description=f"Lead claimed by {user.get_full_name() or user.username}."
         )
+        create_notification(
+            recipient=user,
+            notif_type='LEAD_CLAIMED',
+            title='Lead Claimed',
+            message=f"You claimed lead {lead.name}.",
+            lead=lead
+        )
+        for admin in User.objects.filter(profile__role='ADMIN', is_active=True):
+            create_notification(
+                recipient=admin,
+                notif_type='LEAD_CLAIMED',
+                title='Lead Claimed',
+                message=f"{user.get_full_name() or user.username} claimed lead {lead.name}.",
+                lead=lead
+            )
 
         serializer = self.get_serializer(lead)
         return Response(serializer.data)
@@ -580,6 +707,14 @@ class TaskViewSet(viewsets.ModelViewSet):
                 activity_type='TASK_CREATED',
                 description=f"Task '{task.title}' created and assigned to {task.assigned_to.username}."
             )
+        create_notification(
+            recipient=task.assigned_to,
+            notif_type='TASK_ASSIGNED',
+            title='Task Assigned',
+            message=f"Task '{task.title}' was assigned to you.",
+            lead=task.lead,
+            task=task
+        )
 
     def perform_update(self, serializer):
         task = self.get_object()
@@ -615,6 +750,14 @@ class FollowUpViewSet(viewsets.ModelViewSet):
             activity_type='FOLLOW_UP_SCHEDULED',
             description=f"Follow-up scheduled for {followup.scheduled_time.strftime('%Y-%m-%d %H:%M')}."
         )
+        if followup.lead.owner:
+            create_notification(
+                recipient=followup.lead.owner,
+                notif_type='FOLLOWUP_REMINDER',
+                title='Follow-up Reminder',
+                message=f"Follow-up scheduled for lead {followup.lead.name} at {followup.scheduled_time.strftime('%Y-%m-%d %H:%M')}.",
+                lead=followup.lead
+            )
 
     def perform_update(self, serializer):
         followup = self.get_object()
@@ -654,6 +797,23 @@ class CommissionViewSet(viewsets.ModelViewSet):
             activity_type='COMMISSION_APPROVED',
             description=f"Commission of ${comm.amount:.2f} approved for {comm.agent.username}."
         )
+        create_notification(
+            recipient=comm.agent,
+            notif_type='COMMISSION_APPROVED',
+            title='Commission Approved',
+            message=f"Commission ${comm.amount:.2f} for lead {comm.lead.name} was approved.",
+            lead=comm.lead,
+            commission=comm
+        )
+        if comm.lead.owner:
+            create_notification(
+                recipient=comm.lead.owner,
+                notif_type='CONVERSION_APPROVED',
+                title='Conversion Approved',
+                message=f"Lead {comm.lead.name} conversion has been approved.",
+                lead=comm.lead,
+                commission=comm
+            )
         return Response(CommissionSerializer(comm).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUserRole])

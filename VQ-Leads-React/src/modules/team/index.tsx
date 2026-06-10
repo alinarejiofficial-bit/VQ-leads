@@ -7,7 +7,7 @@ import { Card } from '../../components/common/Card';
 import { Input } from '../../components/forms/Input';
 import { Dialog } from '../../components/common/Dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/datatable/Table';
-import { Plus, Pencil, KeyRound, UserCheck, UserX } from 'lucide-react';
+import { Plus, Pencil, KeyRound, UserCheck, UserX, Eye, EyeOff } from 'lucide-react';
 import { RolesTab } from './RolesTab';
 import { PerformanceTab } from './PerformanceTab';
 import { CommissionTab } from './CommissionTab';
@@ -28,6 +28,7 @@ export const Teams: React.FC = () => {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [agentUser, setAgentUser] = useState('');
   const [agentPass, setAgentPass] = useState('');
+  const [showAgentPassword, setShowAgentPassword] = useState(false);
   const [agentEmail, setAgentEmail] = useState('');
   const [agentFirst, setAgentFirst] = useState('');
   const [agentLast, setAgentLast] = useState('');
@@ -43,6 +44,7 @@ export const Teams: React.FC = () => {
 
   const [resetMember, setResetMember] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const { data: teams = [] } = useQuery<SalesTeam[]>({
     queryKey: ['teams'],
@@ -85,6 +87,7 @@ export const Teams: React.FC = () => {
       setAgentLast('');
       setAgentComm('');
       setAgentRole('AGENT');
+      setShowAgentPassword(false);
     },
     onError: (err: Error) => {
       alert(err.message || 'Failed to add member');
@@ -113,6 +116,7 @@ export const Teams: React.FC = () => {
     onSuccess: () => {
       setResetMember(null);
       setNewPassword('');
+      setShowResetPassword(false);
       alert('Password reset successfully');
     },
     onError: (err: Error) => alert(err.message || 'Failed to reset password'),
@@ -440,7 +444,23 @@ export const Teams: React.FC = () => {
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-foreground">Password *</label>
-            <Input type="password" value={agentPass} onChange={e => setAgentPass(e.target.value)} required />
+            <div className="relative">
+              <Input
+                type={showAgentPassword ? 'text' : 'password'}
+                value={agentPass}
+                onChange={e => setAgentPass(e.target.value)}
+                required
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowAgentPassword(prev => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showAgentPassword ? 'Hide password' : 'Show password'}
+              >
+                {showAgentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
@@ -537,15 +557,24 @@ export const Teams: React.FC = () => {
           <p className="text-sm text-muted-foreground text-left">
             Set a new password for <span className="font-semibold text-foreground">{resetMember?.full_name}</span>
           </p>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 relative">
             <label className="text-xs font-semibold text-foreground">New Password *</label>
             <Input
-              type="password"
+              type={showResetPassword ? 'text' : 'password'}
               value={newPassword}
               onChange={e => setNewPassword(e.target.value)}
               required
               minLength={6}
+              className="pr-10"
             />
+            <button
+              type="button"
+              onClick={() => setShowResetPassword(prev => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={showResetPassword ? 'Hide password' : 'Show password'}
+            >
+              {showResetPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
             <Button type="button" variant="outline" onClick={() => setResetMember(null)}>Cancel</Button>

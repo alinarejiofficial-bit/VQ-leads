@@ -2,11 +2,19 @@ import React, { useState } from 'react';
 import { Search, Bell, Plus, FileSpreadsheet, FileCode, ChevronDown } from 'lucide-react';
 import { useAuthStore } from '../../store';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../../api';
 
 export const Header: React.FC = () => {
   const user = useAuthStore(state => state.user);
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const { data: notifications } = useQuery({
+    queryKey: ['notifications-bell'],
+    queryFn: () => api.getNotifications({ archived: false }),
+    refetchInterval: 15000,
+  });
+  const unreadCount = notifications?.unreadCount || 0;
 
   return (
     <header className="min-h-[70px] border-b border-border/80 flex flex-col md:flex-row md:items-center justify-between gap-4 px-8 py-3 bg-card/45 backdrop-blur-xl sticky top-0 z-40">
@@ -51,13 +59,15 @@ export const Header: React.FC = () => {
 
         {/* Notifications */}
         <button 
-          onClick={() => navigate('/tasks')}
+          onClick={() => navigate('/notifications')}
           className="relative h-9 w-9 rounded-xl hover:bg-secondary/50 flex items-center justify-center text-muted-foreground hover:text-foreground transition-all border border-border/60"
         >
           <Bell size={16} />
-          <span className="absolute top-1.5 right-1.5 h-3.5 w-3.5 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center border-2 border-card">
-            2
-          </span>
+          {unreadCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 min-w-[14px] h-3.5 px-1 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center border-2 border-card">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </button>
 
         {/* Profile Menu */}

@@ -5,7 +5,7 @@ from .views import (
     SalesTeamViewSet, LeadFormViewSet, PublicFormDetailView,
     PublicFormSubmitView, TaskViewSet, FollowUpViewSet,
     CommissionViewSet, DashboardStatsView, DashboardChartsView, AgentDashboardView,
-    TeamPerformanceView, CommissionSettingsView,
+    TeamPerformanceView, CommissionSettingsView, NotificationViewSet,
 )
 
 router = DefaultRouter()
@@ -15,6 +15,7 @@ router.register(r'forms', LeadFormViewSet, basename='form')
 router.register(r'tasks', TaskViewSet, basename='task')
 router.register(r'followups', FollowUpViewSet, basename='followup')
 router.register(r'commissions', CommissionViewSet, basename='commission')
+router.register(r'notifications', NotificationViewSet, basename='notification')
 
 urlpatterns = [
     # Auth endpoints
