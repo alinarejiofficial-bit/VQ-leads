@@ -8,6 +8,7 @@ import { Input } from '../../components/forms/Input';
 import { Dialog } from '../../components/common/Dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/datatable/Table';
 import { LeadDetailsDrawer } from './components/LeadDetailsDrawer';
+import { MyLeadsPipeline } from './components/MyLeadsPipeline';
 import { Plus, Search, UserCheck } from 'lucide-react';
 
 interface LeadsProps {
@@ -24,7 +25,12 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [viewMode, setViewMode] = useState<'pipeline' | 'list' | 'kanban'>('pipeline');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
+
+  const isAdmin = user.profile.role === 'ADMIN';
+  const canClaimLeads = !isAdmin;
 
   useEffect(() => {
     if (!urlFilter) {
@@ -33,10 +39,8 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
       setSourceFilter('');
       setOwnerFilter('');
     }
-    setViewMode('list');
-  }, [location.search, urlFilter]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
+    setViewMode(canClaimLeads ? 'pipeline' : 'list');
+  }, [location.search, urlFilter, canClaimLeads]);
 
   // Form states for new lead
   const [newLeadName, setNewLeadName] = useState('');
@@ -46,9 +50,6 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const [newLeadValue, setNewLeadValue] = useState('0.00');
   const [newLeadSource, setNewLeadSource] = useState('Manual Entry');
   const [newLeadOwner, setNewLeadOwner] = useState<number | null>(null);
-
-  const isAdmin = user.profile.role === 'ADMIN';
-  const canClaimLeads = !isAdmin;
 
   const canClaimLead = (lead: Lead) => canClaimLeads && !lead.owner;
 
@@ -90,6 +91,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
     }
   });
 
@@ -98,6 +100,8 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
+      setViewMode('pipeline');
     },
     onError: (err: Error) => {
       alert(err.message || 'Failed to claim lead');
@@ -152,6 +156,11 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
 
     return matchesSearch && matchesStatus && matchesSource && matchesOwner && matchesSidebarFilter;
   });
+
+  const myPipelineLeads = filteredLeads.filter(
+    l => l.owner === user.id && l.status !== 'WON' && l.status !== 'LOST'
+  );
+  const availableLeads = filteredLeads.filter(l => canClaimLead(l));
 
   const sources = Array.from(new Set(leads.map(l => l.source)));
 
@@ -219,6 +228,14 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
         <div className="flex items-center gap-3 self-end md:self-auto">
           {/* Switch view */}
           <div className="inline-flex items-center justify-center rounded-lg bg-muted/40 p-1 border border-border/40 text-xs">
+            {canClaimLeads && (
+              <button
+                className={`px-3 py-1.5 rounded-md font-semibold transition-all ${viewMode === 'pipeline' ? 'bg-secondary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setViewMode('pipeline')}
+              >
+                Pipeline
+              </button>
+            )}
             <button
               className={`px-3 py-1.5 rounded-md font-semibold transition-all ${viewMode === 'list' ? 'bg-secondary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => setViewMode('list')}
@@ -239,8 +256,46 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Grid or List render */}
-      {viewMode === 'list' ? (
+      {/* Pipeline view — claimed leads with quick actions */}
+      {viewMode === 'pipeline' && canClaimLeads ? (
+        <div className="space-y-8">
+          <MyLeadsPipeline
+            leads={myPipelineLeads}
+            onStatusChange={moveLeadStatus}
+            onEdit={setSelectedLeadId}
+            isUpdating={updateLeadMutation.isPending}
+          />
+          {myPipelineLeads.length === 0 && (
+            <div className="text-center text-muted-foreground py-12 border border-dashed border-border/60 rounded-xl">
+              No leads in your pipeline yet. Claim a lead below to get started.
+            </div>
+          )}
+          {availableLeads.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-foreground text-left">
+                Available to Claim ({availableLeads.length})
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {availableLeads.map(l => (
+                  <div key={l.id} className="bg-card border border-border/80 rounded-xl p-4 text-left">
+                    <h4 className="font-bold text-foreground">{l.name}</h4>
+                    <p className="text-xs text-muted-foreground mt-1">{l.source} • ${l.value}</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full mt-4 border-primary/50 text-primary hover:bg-primary/10"
+                      disabled={claimLeadMutation.isPending}
+                      onClick={e => handleClaimLead(e, l.id)}
+                    >
+                      <UserCheck size={14} className="mr-1.5" /> Claim Lead
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : viewMode === 'list' ? (
         <Card className="overflow-hidden">
           <Table>
             <TableHeader>
