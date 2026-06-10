@@ -40,13 +40,14 @@ class SalesTeamSerializer(serializers.ModelSerializer):
 
 class LeadFormSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
-    submission_count = serializers.IntegerField(read_only=True)
+    submission_count = serializers.SerializerMethodField()
 
     class Meta:
         model = LeadForm
         fields = [
             'id', 'name', 'description', 'assignment_mode', 'is_active',
             'source_name', 'submission_count',
+            'form_fields', 'multi_step_enabled', 'thank_you_mode', 'thank_you_message', 'thank_you_redirect_url',
             'created_at', 'created_by', 'created_by_name'
         ]
 
@@ -55,6 +56,11 @@ class LeadFormSerializer(serializers.ModelSerializer):
             name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
             return name if name else obj.created_by.username
         return "System"
+
+    def get_submission_count(self, obj):
+        if hasattr(obj, 'submission_count'):
+            return obj.submission_count
+        return obj.leads.count()
 
 
 class LeadSerializer(serializers.ModelSerializer):

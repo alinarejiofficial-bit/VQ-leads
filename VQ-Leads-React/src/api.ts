@@ -37,9 +37,40 @@ export interface LeadForm {
   assignment_mode: 'MANUAL' | 'ROUND_ROBIN';
   is_active: boolean;
   source_name: string;
+  submission_count: number;
+  form_fields: FormFieldConfig[];
+  multi_step_enabled: boolean;
+  thank_you_mode: 'DEFAULT' | 'MESSAGE' | 'REDIRECT';
+  thank_you_message: string;
+  thank_you_redirect_url: string;
   created_at: string;
   created_by: number | null;
   created_by_name: string;
+}
+
+export type FormFieldType =
+  | 'TEXT' | 'EMAIL' | 'PHONE' | 'NUMBER' | 'DROPDOWN'
+  | 'RADIO' | 'CHECKBOX' | 'DATE' | 'TEXTAREA' | 'FILE';
+
+export interface FormFieldConfig {
+  id: string;
+  key: string;
+  label: string;
+  type: FormFieldType;
+  required: boolean;
+  placeholder?: string;
+  help_text?: string;
+  options?: string[];
+  validation?: {
+    pattern?: string;
+    min?: number;
+    max?: number;
+    min_length?: number;
+    max_length?: number;
+    file_types?: string[];
+    max_file_mb?: number;
+  };
+  map_to?: 'NONE' | 'name' | 'email' | 'phone' | 'company' | 'value' | 'notes';
 }
 
 export interface Lead {
@@ -818,8 +849,11 @@ export const api = {
   },
 
   // Forms
-  async getForms(): Promise<LeadForm[]> {
-    return request<LeadForm[]>('/forms/');
+  async getForms(params?: { q?: string }): Promise<LeadForm[]> {
+    const query = new URLSearchParams();
+    if (params?.q) query.set('q', params.q);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<LeadForm[]>(`/forms/${suffix}`);
   },
 
   async createForm(form: Partial<LeadForm>): Promise<LeadForm> {
@@ -842,6 +876,14 @@ export const api = {
     });
   },
 
+  async duplicateForm(id: number): Promise<LeadForm> {
+    return request<LeadForm>(`/forms/${id}/duplicate/`, { method: 'POST' });
+  },
+
+  async toggleFormActive(id: number): Promise<LeadForm> {
+    return request<LeadForm>(`/forms/${id}/toggle_active/`, { method: 'POST' });
+  },
+
   // Public Form (No authentication token needed)
   async getPublicForm(id: number): Promise<LeadForm> {
     const response = await fetch(`${API_BASE}/public/forms/${id}/`);
@@ -852,12 +894,11 @@ export const api = {
   },
 
   async submitPublicForm(id: number, data: any): Promise<{ success: boolean; lead: Lead; assigned_to: string }> {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
     const response = await fetch(`${API_BASE}/public/forms/${id}/submit/`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
+      headers: isFormData ? {} : { 'Content-Type': 'application/json' },
+      body: isFormData ? data : JSON.stringify(data),
     });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));

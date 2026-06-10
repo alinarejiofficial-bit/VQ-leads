@@ -89,6 +89,15 @@ class LeadForm(models.Model):
     )
     is_active = models.BooleanField(default=True)
     source_name = models.CharField(max_length=100, default='Website Form')
+    form_fields = models.JSONField(default=list, blank=True)
+    multi_step_enabled = models.BooleanField(default=False)
+    thank_you_mode = models.CharField(
+        max_length=20,
+        choices=[('DEFAULT', 'Default'), ('MESSAGE', 'Message'), ('REDIRECT', 'Redirect')],
+        default='DEFAULT'
+    )
+    thank_you_message = models.TextField(blank=True, default='')
+    thank_you_redirect_url = models.URLField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
         User,

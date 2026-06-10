@@ -3,6 +3,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
@@ -11,6 +12,8 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 from decimal import Decimal
 import datetime
+import json
+import re
 
 from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission, CommissionSettings, Notification, ImportHistory, ExportHistory
 from .serializers import (
@@ -632,16 +635,114 @@ class SalesTeamViewSet(viewsets.ModelViewSet):
         return SalesTeam.objects.all().order_by('name')
 
 
+def default_form_fields():
+    return [
+        {
+            'id': 'name',
+            'key': 'name',
+            'label': 'Full Name',
+            'type': 'TEXT',
+            'required': True,
+            'placeholder': 'e.g. John Doe',
+            'map_to': 'name',
+        },
+        {
+            'id': 'email',
+            'key': 'email',
+            'label': 'Email Address',
+            'type': 'EMAIL',
+            'required': False,
+            'placeholder': 'john@example.com',
+            'map_to': 'email',
+        },
+        {
+            'id': 'phone',
+            'key': 'phone',
+            'label': 'Phone Number',
+            'type': 'PHONE',
+            'required': False,
+            'placeholder': '+1 555 000 0000',
+            'map_to': 'phone',
+        },
+        {
+            'id': 'company',
+            'key': 'company',
+            'label': 'Company Name',
+            'type': 'TEXT',
+            'required': False,
+            'placeholder': 'Acme Inc',
+            'map_to': 'company',
+        },
+        {
+            'id': 'value',
+            'key': 'value',
+            'label': 'Estimated Deal Size',
+            'type': 'NUMBER',
+            'required': False,
+            'placeholder': '0.00',
+            'map_to': 'value',
+        },
+        {
+            'id': 'notes',
+            'key': 'notes',
+            'label': 'Inquiry Details',
+            'type': 'TEXTAREA',
+            'required': False,
+            'placeholder': 'How can we help?',
+            'map_to': 'notes',
+        },
+    ]
+
+
 # Lead Form ViewSet
 class LeadFormViewSet(viewsets.ModelViewSet):
     serializer_class = LeadFormSerializer
     permission_classes = [IsAdminOrReadOnly]
 
     def get_queryset(self):
-        return LeadForm.objects.all().order_by('-created_at')
+        qs = LeadForm.objects.annotate(submission_count=Count('leads')).order_by('-created_at')
+        q = self.request.query_params.get('q')
+        if q:
+            qs = qs.filter(
+                Q(name__icontains=q) |
+                Q(description__icontains=q) |
+                Q(source_name__icontains=q)
+            )
+        return qs
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        payload_fields = serializer.validated_data.get('form_fields')
+        serializer.save(
+            created_by=self.request.user,
+            form_fields=payload_fields if payload_fields else default_form_fields()
+        )
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUserRole])
+    def duplicate(self, request, pk=None):
+        original = self.get_object()
+        duplicate = LeadForm.objects.create(
+            name=f"{original.name} (Copy)",
+            description=original.description,
+            assignment_mode=original.assignment_mode,
+            is_active=False,
+            source_name=original.source_name,
+            form_fields=original.form_fields or default_form_fields(),
+            multi_step_enabled=original.multi_step_enabled,
+            thank_you_mode=original.thank_you_mode,
+            thank_you_message=original.thank_you_message,
+            thank_you_redirect_url=original.thank_you_redirect_url,
+            created_by=request.user,
+        )
+        serializer = self.get_serializer(duplicate)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUserRole])
+    def toggle_active(self, request, pk=None):
+        form = self.get_object()
+        form.is_active = not form.is_active
+        form.save(update_fields=['is_active'])
+        serializer = self.get_serializer(form)
+        return Response(serializer.data)
 
 
 # Public Form APIs (No Authentication Required)
@@ -659,6 +760,7 @@ class PublicFormDetailView(APIView):
 
 class PublicFormSubmitView(APIView):
     permission_classes = [permissions.AllowAny]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request, pk):
         try:
@@ -666,12 +768,94 @@ class PublicFormSubmitView(APIView):
         except LeadForm.DoesNotExist:
             return Response({'error': 'Active lead form not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        name = request.data.get('name')
+        form_fields = form.form_fields or default_form_fields()
+
+        submission_data = request.data.get('submission_data')
+        if isinstance(submission_data, str):
+            try:
+                submission_data = json.loads(submission_data)
+            except json.JSONDecodeError:
+                submission_data = {}
+        if not isinstance(submission_data, dict):
+            submission_data = {}
+
+        name = request.data.get('name') or ''
         email = request.data.get('email', '')
         phone = request.data.get('phone', '')
         company = request.data.get('company', '')
         notes = request.data.get('notes', '')
-        value = Decimal(str(request.data.get('value', '0.00') or '0.00'))
+        value = request.data.get('value', '0.00')
+        custom_data = {}
+
+        for field in form_fields:
+            key = field.get('key')
+            if not key:
+                continue
+            raw = request.FILES.get(key) if field.get('type') == 'FILE' else submission_data.get(key, request.data.get(key))
+            if raw is None:
+                raw = ''
+
+            if field.get('required') and (raw == '' or raw == []):
+                return Response({'error': f"{field.get('label', key)} is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            field_type = field.get('type')
+            validation = field.get('validation') or {}
+
+            if raw not in ('', None):
+                if field_type == 'EMAIL':
+                    if not re.match(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$', str(raw)):
+                        return Response({'error': f"Invalid email in {field.get('label', key)}."}, status=status.HTTP_400_BAD_REQUEST)
+                elif field_type == 'PHONE':
+                    if not re.match(r'^[+0-9()\\-\\s]{6,25}$', str(raw)):
+                        return Response({'error': f"Invalid phone in {field.get('label', key)}."}, status=status.HTTP_400_BAD_REQUEST)
+                elif field_type == 'NUMBER':
+                    try:
+                        num = Decimal(str(raw))
+                    except Exception:
+                        return Response({'error': f"{field.get('label', key)} must be a number."}, status=status.HTTP_400_BAD_REQUEST)
+                    if validation.get('min') is not None and num < Decimal(str(validation['min'])):
+                        return Response({'error': f"{field.get('label', key)} must be >= {validation['min']}."}, status=status.HTTP_400_BAD_REQUEST)
+                    if validation.get('max') is not None and num > Decimal(str(validation['max'])):
+                        return Response({'error': f"{field.get('label', key)} must be <= {validation['max']}."}, status=status.HTTP_400_BAD_REQUEST)
+                elif field_type == 'FILE':
+                    max_mb = validation.get('max_file_mb')
+                    if max_mb and hasattr(raw, 'size') and raw.size > int(max_mb) * 1024 * 1024:
+                        return Response({'error': f"{field.get('label', key)} exceeds max file size ({max_mb}MB)."}, status=status.HTTP_400_BAD_REQUEST)
+                    allowed_types = validation.get('file_types') or []
+                    if allowed_types and hasattr(raw, 'name'):
+                        lower_name = raw.name.lower()
+                        if not any(lower_name.endswith(ext.lower()) for ext in allowed_types):
+                            return Response({'error': f"{field.get('label', key)} must match allowed file type."}, status=status.HTTP_400_BAD_REQUEST)
+                    raw = raw.name if hasattr(raw, 'name') else str(raw)
+                else:
+                    text = str(raw)
+                    if validation.get('min_length') is not None and len(text) < int(validation['min_length']):
+                        return Response({'error': f"{field.get('label', key)} is too short."}, status=status.HTTP_400_BAD_REQUEST)
+                    if validation.get('max_length') is not None and len(text) > int(validation['max_length']):
+                        return Response({'error': f"{field.get('label', key)} is too long."}, status=status.HTTP_400_BAD_REQUEST)
+                    if validation.get('pattern') and not re.match(validation['pattern'], text):
+                        return Response({'error': f"{field.get('label', key)} format is invalid."}, status=status.HTTP_400_BAD_REQUEST)
+
+            map_to = field.get('map_to')
+            if map_to == 'name' and raw:
+                name = str(raw)
+            elif map_to == 'email' and raw:
+                email = str(raw)
+            elif map_to == 'phone' and raw:
+                phone = str(raw)
+            elif map_to == 'company' and raw:
+                company = str(raw)
+            elif map_to == 'value' and raw not in ('', None):
+                value = raw
+            elif map_to == 'notes' and raw:
+                notes = str(raw)
+            else:
+                custom_data[key] = raw
+
+        try:
+            value = Decimal(str(value or '0.00'))
+        except Exception:
+            return Response({'error': 'Invalid value field.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not name:
             return Response({'error': 'Name is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -700,6 +884,14 @@ class PublicFormSubmitView(APIView):
                 user=None,
                 activity_type='NOTE_ADDED',
                 description=f"Form Submission Notes: {notes}"
+            )
+
+        if custom_data:
+            LeadActivity.objects.create(
+                lead=lead,
+                user=None,
+                activity_type='FORM_DATA',
+                description=f"Additional Form Data: {json.dumps(custom_data, default=str)}"
             )
 
         # Round Robin routing via Celery background task
