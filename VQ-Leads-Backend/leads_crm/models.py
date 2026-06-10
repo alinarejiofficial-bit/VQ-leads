@@ -498,6 +498,39 @@ class ExportHistory(models.Model):
         return f"Export {self.id} - {self.file_name}"
 
 
+class ReportCache(models.Model):
+    report_type = models.CharField(max_length=50)
+    report_data = models.JSONField(default=dict)
+    generated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='generated_reports')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.report_type} report @ {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class CommissionReport(models.Model):
+    PAYMENT_STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('PAID', 'Paid'),
+    ]
+
+    agent = models.ForeignKey(User, on_delete=models.CASCADE, related_name='commission_reports')
+    sales_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    commission_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.agent.username} commission report {self.commission_amount}"
+
+
 class Commission(models.Model):
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),

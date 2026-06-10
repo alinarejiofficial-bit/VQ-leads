@@ -15,6 +15,10 @@ from .export_views import ExportPreviewView, ExportGenerateView, ExportHistoryVi
 from .activities_views import ActivitiesTimelineView, CallLogViewSet, LeadNoteViewSet, LeadEmailViewSet, ActivityWidgetStatsView
 from .task_views import TaskCommentViewSet, TaskHistoryViewSet, TaskWidgetStatsView
 from .followup_views import FollowUpHistoryViewSet, FollowUpWidgetStatsView, FollowUpAnalyticsView
+from .reports_views import (
+    ReportsDashboardWidgetsView, ReportsAnalyticsView,
+    ReportsExportView, ReportsExportHistoryView
+)
 
 router = DefaultRouter()
 router.register(r'leads', LeadViewSet, basename='lead')
@@ -66,6 +70,10 @@ urlpatterns = [
     path('tasks/widgets/', TaskWidgetStatsView.as_view(), name='tasks_widgets'),
     path('followups/widgets/', FollowUpWidgetStatsView.as_view(), name='followups_widgets'),
     path('followups/analytics/', FollowUpAnalyticsView.as_view(), name='followups_analytics'),
+    path('reports/widgets/', ReportsDashboardWidgetsView.as_view(), name='reports_widgets'),
+    path('reports/analytics/', ReportsAnalyticsView.as_view(), name='reports_analytics'),
+    path('reports/export/', ReportsExportView.as_view(), name='reports_export'),
+    path('reports/export-history/', ReportsExportHistoryView.as_view(), name='reports_export_history'),
 
     # ViewSet Router
     path('', include(router.urls)),

@@ -547,6 +547,113 @@ export interface DashboardCharts {
   monthlyRevenue: MonthlyRevenueItem[];
 }
 
+export interface ReportsFilters {
+  quickFilter?: 'TODAY' | 'YESTERDAY' | 'THIS_WEEK' | 'THIS_MONTH' | 'THIS_QUARTER' | 'THIS_YEAR' | 'CUSTOM';
+  dateFrom?: string;
+  dateTo?: string;
+  leadStatus?: string;
+  leadSource?: string;
+  teamMember?: string;
+  agent?: string;
+  campaign?: string;
+  region?: string;
+}
+
+export interface ReportsWidgets {
+  totalLeads: number;
+  pipelineValue: number;
+  conversionRate: number;
+  revenueGenerated: number;
+  topLeadSource: string;
+  topPerformingAgent: string;
+  pendingFollowups: number;
+  wonDeals: number;
+  lostDeals: number;
+  commissionPaid: number;
+}
+
+export interface LeadReportsData {
+  metrics: {
+    totalLeads: number;
+    newLeads: number;
+    contactedLeads: number;
+    qualifiedLeads: number;
+    proposalSentLeads: number;
+    negotiationLeads: number;
+    wonLeads: number;
+    lostLeads: number;
+  };
+  statusBreakdown: Record<string, number>;
+  growthTrend: { date: string; count: number }[];
+  pipelineFunnel: { stage: string; count: number }[];
+  leadAging: { leadName: string; status: string; owner: string; source: string; ageDays: number; createdAt: string }[];
+  pipelineValue: number;
+}
+
+export interface ConversionReportsData {
+  metrics: {
+    totalLeads: number;
+    convertedLeads: number;
+    conversionRate: number;
+    lostLeads: number;
+    avgConversionTimeDays: number;
+  };
+  funnel: { stage: string; count: number }[];
+  monthlyTrend: { month: string; converted: number }[];
+  conversionByAgent: { agent: string; username: string; converted: number }[];
+  conversionBySource: { source: string; converted: number }[];
+}
+
+export interface SourceReportsData {
+  table: {
+    source: string;
+    leadsGenerated: number;
+    convertedLeads: number;
+    conversionRate: number;
+    revenueGenerated: number;
+  }[];
+  sourceComparison: { label: string; value: number }[];
+  sourceDistribution: { label: string; value: number }[];
+  revenueBySource: { label: string; value: number }[];
+}
+
+export interface TeamReportsData {
+  table: {
+    agentName: string;
+    username: string;
+    assignedLeads: number;
+    leadsContacted: number;
+    followupsCompleted: number;
+    callsMade: number;
+    meetingsConducted: number;
+    wonDeals: number;
+    revenueGenerated: number;
+    activitiesCompleted: number;
+    conversionRate: number;
+  }[];
+  leaderboard: { label: string; value: number }[];
+  agentComparison: { label: string; value: number }[];
+  revenueByAgent: { label: string; value: number }[];
+}
+
+export interface CommissionReportsData {
+  metrics: {
+    totalSales: number;
+    commissionEarned: number;
+    paidCommission: number;
+    pendingCommission: number;
+  };
+  monthlyReport: { month: string; commissionEarned: number; commissionPaid: number }[];
+  agentWise: {
+    agent: string;
+    username: string;
+    salesAmount: number;
+    commissionRate: number;
+    commissionAmount: number;
+    paymentStatus: string;
+  }[];
+}
+
 export interface AgentDashboardData {
   summary: {
     myLeads: number;
@@ -1244,6 +1351,82 @@ export const api = {
 
   async getExportStats(): Promise<ExportStats> {
     return request<ExportStats>('/exports/stats/');
+  },
+
+  // Reports & analytics
+  async getReportsWidgets(filters?: ReportsFilters): Promise<ReportsWidgets> {
+    const query = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
+    });
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<ReportsWidgets>(`/reports/widgets/${suffix}`);
+  },
+
+  async getLeadReports(filters?: ReportsFilters): Promise<LeadReportsData> {
+    const query = new URLSearchParams({ reportType: 'lead' });
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
+    });
+    return request<LeadReportsData>(`/reports/analytics/?${query.toString()}`);
+  },
+
+  async getConversionReports(filters?: ReportsFilters): Promise<ConversionReportsData> {
+    const query = new URLSearchParams({ reportType: 'conversion' });
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
+    });
+    return request<ConversionReportsData>(`/reports/analytics/?${query.toString()}`);
+  },
+
+  async getSourceReports(filters?: ReportsFilters): Promise<SourceReportsData> {
+    const query = new URLSearchParams({ reportType: 'source' });
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
+    });
+    return request<SourceReportsData>(`/reports/analytics/?${query.toString()}`);
+  },
+
+  async getTeamReports(filters?: ReportsFilters): Promise<TeamReportsData> {
+    const query = new URLSearchParams({ reportType: 'team' });
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
+    });
+    return request<TeamReportsData>(`/reports/analytics/?${query.toString()}`);
+  },
+
+  async getCommissionReports(filters?: ReportsFilters): Promise<CommissionReportsData> {
+    const query = new URLSearchParams({ reportType: 'commission' });
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
+    });
+    return request<CommissionReportsData>(`/reports/analytics/?${query.toString()}`);
+  },
+
+  async exportReport(
+    reportType: 'lead' | 'conversion' | 'source' | 'team' | 'commission',
+    fileType: 'csv' | 'xlsx' | 'pdf',
+    filters?: ReportsFilters
+  ): Promise<Blob> {
+    const token = localStorage.getItem('vq_token');
+    const response = await fetch(`${API_BASE}/reports/export/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ reportType, fileType, ...(filters || {}) }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to export report');
+    }
+    return response.blob();
+  },
+
+  async getReportsExportHistory(search?: string): Promise<ExportHistoryItem[]> {
+    const q = search ? `?reportOnly=true&search=${encodeURIComponent(search)}` : '?reportOnly=true';
+    return request<ExportHistoryItem[]>(`/reports/export-history/${q}`);
   },
 
   // Dashboards

@@ -803,10 +803,10 @@ class PublicFormSubmitView(APIView):
 
             if raw not in ('', None):
                 if field_type == 'EMAIL':
-                    if not re.match(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$', str(raw)):
+                    if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', str(raw)):
                         return Response({'error': f"Invalid email in {field.get('label', key)}."}, status=status.HTTP_400_BAD_REQUEST)
                 elif field_type == 'PHONE':
-                    if not re.match(r'^[+0-9()\\-\\s]{6,25}$', str(raw)):
+                    if not re.match(r'^[+0-9()\-\s]{6,25}$', str(raw)):
                         return Response({'error': f"Invalid phone in {field.get('label', key)}."}, status=status.HTTP_400_BAD_REQUEST)
                 elif field_type == 'NUMBER':
                     try:
