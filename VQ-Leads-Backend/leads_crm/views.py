@@ -510,6 +510,12 @@ class LeadViewSet(viewsets.ModelViewSet):
                     message=f"You were assigned lead {updated_lead.name}.",
                     lead=updated_lead
                 )
+                # Lead is no longer available; archive stale availability notifications.
+                Notification.objects.filter(
+                    lead=updated_lead,
+                    type='NEW_LEAD_AVAILABLE',
+                    is_archived=False
+                ).update(is_archived=True, is_read=True)
             else:
                 recipients = User.objects.filter(profile__role__in=['AGENT', 'LEADER'], is_active=True)
                 for recipient in recipients:
@@ -549,6 +555,27 @@ class LeadViewSet(viewsets.ModelViewSet):
             activity_type='CLAIM',
             description=f"Lead claimed by {user.get_full_name() or user.username}."
         )
+        claimer_name = user.get_full_name() or user.username
+
+        # Update the existing "New Lead Available" notifications in place so the
+        # other agents keep the notification but see it as claimed (not removed).
+        prior_recipient_ids = set(
+            Notification.objects.filter(
+                lead=lead,
+                type='NEW_LEAD_AVAILABLE',
+            ).exclude(recipient=user).values_list('recipient_id', flat=True).distinct()
+        )
+        Notification.objects.filter(
+            lead=lead,
+            type='NEW_LEAD_AVAILABLE',
+        ).exclude(recipient=user).update(
+            type='LEAD_CLAIMED',
+            title='Lead Claimed',
+            message=f"Lead {lead.name} was claimed by {claimer_name}.",
+            is_read=False,
+            is_archived=False,
+        )
+
         create_notification(
             recipient=user,
             notif_type='LEAD_CLAIMED',
@@ -556,12 +583,16 @@ class LeadViewSet(viewsets.ModelViewSet):
             message=f"You claimed lead {lead.name}.",
             lead=lead
         )
+
+        # Notify admins who weren't already updated above.
         for admin in User.objects.filter(profile__role='ADMIN', is_active=True):
+            if admin.id == user.id or admin.id in prior_recipient_ids:
+                continue
             create_notification(
                 recipient=admin,
                 notif_type='LEAD_CLAIMED',
                 title='Lead Claimed',
-                message=f"{user.get_full_name() or user.username} claimed lead {lead.name}.",
+                message=f"{claimer_name} claimed lead {lead.name}.",
                 lead=lead
             )
 

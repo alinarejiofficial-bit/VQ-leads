@@ -9,10 +9,10 @@ import { Shield, Users, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [roleTab, setRoleTab] = useState<'agent' | 'admin'>('agent');
-  const [adminUsername, setAdminUsername] = useState('admin');
-  const [adminPassword, setAdminPassword] = useState('admin123');
-  const [agentUsername, setAgentUsername] = useState('agent1');
-  const [agentPassword, setAgentPassword] = useState('agent123');
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [agentUsername, setAgentUsername] = useState('');
+  const [agentPassword, setAgentPassword] = useState('');
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [showAgentPassword, setShowAgentPassword] = useState(false);
   const [error, setError] = useState('');

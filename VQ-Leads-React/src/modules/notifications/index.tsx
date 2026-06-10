@@ -60,25 +60,8 @@ export const Notifications: React.FC = () => {
 
   return (
     <div className="p-8 space-y-6 max-w-6xl mx-auto text-left">
-      <Card className="p-6">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h3 className="text-lg font-bold text-foreground">Notification Center</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              New Lead Available, Lead Assigned/Claimed, Task Assigned, Follow-up Reminder, Conversion Approved, and Commission Approved.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => markAllReadMutation.mutate()}
-            disabled={markAllReadMutation.isPending}
-          >
-            <CheckCheck size={14} className="mr-1.5" /> Mark All Read
-          </Button>
-        </div>
-      </Card>
-
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center justify-between flex-wrap">
+        <div className="flex gap-2">
         {[
           { id: 'all' as const, label: 'All' },
           { id: 'unread' as const, label: 'Unread' },
@@ -97,6 +80,14 @@ export const Notifications: React.FC = () => {
             {t.label}
           </button>
         ))}
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => markAllReadMutation.mutate()}
+          disabled={markAllReadMutation.isPending}
+        >
+          <CheckCheck size={14} className="mr-1.5" /> Mark All Read
+        </Button>
       </div>
 
       {isLoading ? (

@@ -25,7 +25,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
-  const [viewMode, setViewMode] = useState<'pipeline' | 'list' | 'kanban'>('pipeline');
+  const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
 
@@ -39,8 +39,8 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
       setSourceFilter('');
       setOwnerFilter('');
     }
-    setViewMode(canClaimLeads ? 'pipeline' : 'list');
-  }, [location.search, urlFilter, canClaimLeads]);
+    setViewMode(isAdmin ? 'list' : 'pipeline');
+  }, [location.search, urlFilter, isAdmin]);
 
   // Form states for new lead
   const [newLeadName, setNewLeadName] = useState('');
@@ -160,18 +160,12 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const myPipelineLeads = filteredLeads.filter(
     l => l.owner === user.id && l.status !== 'WON' && l.status !== 'LOST'
   );
+  const pipelineLeads = isAdmin
+    ? filteredLeads.filter(l => l.status !== 'WON' && l.status !== 'LOST')
+    : myPipelineLeads;
   const availableLeads = filteredLeads.filter(l => canClaimLead(l));
 
   const sources = Array.from(new Set(leads.map(l => l.source)));
-
-  const kanbanColumns = [
-    { id: 'NEW', title: 'New', color: 'bg-blue-500' },
-    { id: 'CONTACTED', title: 'Contacted', color: 'bg-purple-500' },
-    { id: 'IN_PROGRESS', title: 'In Progress', color: 'bg-amber-500' },
-    { id: 'QUALIFIED', title: 'Qualified', color: 'bg-primary' },
-    { id: 'WON', title: 'Won', color: 'bg-green-500' },
-    { id: 'LOST', title: 'Lost', color: 'bg-red-500' }
-  ];
 
   return (
     <div className="p-8 space-y-6">
@@ -228,7 +222,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
         <div className="flex items-center gap-3 self-end md:self-auto">
           {/* Switch view */}
           <div className="inline-flex items-center justify-center rounded-lg bg-muted/40 p-1 border border-border/40 text-xs">
-            {canClaimLeads && (
+            {!isAdmin && (
               <button
                 className={`px-3 py-1.5 rounded-md font-semibold transition-all ${viewMode === 'pipeline' ? 'bg-secondary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                 onClick={() => setViewMode('pipeline')}
@@ -242,12 +236,6 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             >
               List
             </button>
-            <button
-              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${viewMode === 'kanban' ? 'bg-secondary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setViewMode('kanban')}
-            >
-              Kanban
-            </button>
           </div>
 
           <Button onClick={() => setIsModalOpen(true)}>
@@ -257,17 +245,17 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
       </div>
 
       {/* Pipeline view — claimed leads with quick actions */}
-      {viewMode === 'pipeline' && canClaimLeads ? (
+      {viewMode === 'pipeline' && !isAdmin ? (
         <div className="space-y-8">
           <MyLeadsPipeline
-            leads={myPipelineLeads}
+            leads={pipelineLeads}
             onStatusChange={moveLeadStatus}
             onEdit={setSelectedLeadId}
             isUpdating={updateLeadMutation.isPending}
           />
-          {myPipelineLeads.length === 0 && (
+          {pipelineLeads.length === 0 && (
             <div className="text-center text-muted-foreground py-12 border border-dashed border-border/60 rounded-xl">
-              No leads in your pipeline yet. Claim a lead below to get started.
+              No leads in pipeline yet.
             </div>
           )}
           {availableLeads.length > 0 && (
@@ -295,7 +283,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             </div>
           )}
         </div>
-      ) : viewMode === 'list' ? (
+      ) : (
         <Card className="overflow-hidden">
           <Table>
             <TableHeader>
@@ -361,77 +349,6 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             </TableBody>
           </Table>
         </Card>
-      ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4 items-start select-none">
-          {kanbanColumns.map(col => {
-            const colLeads = filteredLeads.filter(l => l.status === col.id);
-            return (
-              <div key={col.id} className="flex-1 min-w-[280px] max-w-[340px] bg-card/40 border border-border/80 rounded-xl p-4 flex flex-col max-h-[calc(100vh-190px)] shrink-0">
-                <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${col.color}`} />
-                    <h4 className="text-sm font-semibold text-foreground">{col.title}</h4>
-                  </div>
-                  <span className="text-[11px] font-bold bg-muted/60 px-2 py-0.5 rounded-full text-muted-foreground">
-                    {colLeads.length}
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-3 overflow-y-auto pr-1">
-                  {colLeads.map(l => (
-                    <div
-                      key={l.id}
-                      className="bg-card border border-border/80 rounded-lg p-4 cursor-pointer hover:border-border/100 hover:shadow-lg transition-all text-left"
-                      onClick={() => setSelectedLeadId(l.id)}
-                    >
-                      <h5 className="text-sm font-semibold text-foreground leading-snug">{l.name}</h5>
-                      <p className="text-xs text-muted-foreground mt-1 mb-3">{l.company || 'No Company'}</p>
-
-                      <div className="flex justify-between items-center text-xs mt-2 pt-2.5 border-t border-border/40">
-                        <span className="font-semibold text-foreground">${l.value}</span>
-                        <span className="text-[10px] bg-muted/40 border border-border/40 px-1.5 py-0.5 rounded text-muted-foreground max-w-[100px] truncate">
-                          {l.owner_name || 'Unassigned'}
-                        </span>
-                      </div>
-
-                      {canClaimLead(l) && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="w-full mt-2 h-8 text-xs border-primary/50 text-primary hover:bg-primary/10"
-                          disabled={claimLeadMutation.isPending}
-                          onClick={e => handleClaimLead(e, l.id)}
-                        >
-                          <UserCheck size={14} className="mr-1" /> Claim Lead
-                        </Button>
-                      )}
-
-                      {/* Manual board transition triggers */}
-                      <div className="flex gap-1.5 mt-3 pt-2 border-t border-border/40 overflow-x-auto justify-end">
-                        {kanbanColumns.map(targetCol => {
-                          if (targetCol.id === col.id) return null;
-                          return (
-                            <button
-                              key={targetCol.id}
-                              className="text-[9px] uppercase font-bold px-1 py-0.5 rounded border border-border bg-muted/10 hover:bg-muted/40 hover:text-foreground text-muted-foreground"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                moveLeadStatus(l.id, targetCol.id);
-                              }}
-                            >
-                              {targetCol.title[0]}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
       )}
 
       {/* New Lead Modal */}

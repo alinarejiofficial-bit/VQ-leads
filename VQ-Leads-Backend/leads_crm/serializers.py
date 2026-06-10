@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission, Notification
+from .models import (
+    UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task,
+    Commission, Notification, ImportHistory, ImportLog, ImportMappingTemplate
+)
 
 class UserProfileSerializer(serializers.ModelSerializer):
     effective_commission_rate = serializers.DecimalField(
@@ -160,3 +163,40 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_commission_amount(self, obj):
         return str(obj.commission.amount) if obj.commission else ''
+
+
+class ImportLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImportLog
+        fields = ['id', 'row_number', 'status', 'error_message', 'row_data', 'created_at']
+
+
+class ImportHistorySerializer(serializers.ModelSerializer):
+    imported_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ImportHistory
+        fields = [
+            'id', 'file_name', 'file_type', 'total_records', 'success_count',
+            'failed_count', 'duplicate_count', 'imported_by', 'imported_by_name',
+            'status', 'duplicate_strategy', 'column_mapping', 'created_at'
+        ]
+
+    def get_imported_by_name(self, obj):
+        if obj.imported_by:
+            name = f"{obj.imported_by.first_name} {obj.imported_by.last_name}".strip()
+            return name if name else obj.imported_by.username
+        return ''
+
+
+class ImportHistoryDetailSerializer(ImportHistorySerializer):
+    logs = ImportLogSerializer(many=True, read_only=True)
+
+    class Meta(ImportHistorySerializer.Meta):
+        fields = ImportHistorySerializer.Meta.fields + ['logs']
+
+
+class ImportMappingTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImportMappingTemplate
+        fields = ['id', 'name', 'mapping', 'created_at']

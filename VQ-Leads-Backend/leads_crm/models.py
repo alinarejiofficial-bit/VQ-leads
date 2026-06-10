@@ -224,6 +224,69 @@ class Notification(models.Model):
         return f"{self.recipient.username}: {self.title}"
 
 
+class ImportHistory(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('PROCESSING', 'Processing'),
+        ('COMPLETED', 'Completed'),
+        ('PARTIAL', 'Partial'),
+        ('FAILED', 'Failed'),
+    ]
+
+    DUPLICATE_STRATEGY_CHOICES = [
+        ('SKIP', 'Skip Duplicates'),
+        ('UPDATE', 'Update Existing Leads'),
+        ('IMPORT_ALL', 'Import All Anyway'),
+    ]
+
+    file_name = models.CharField(max_length=255)
+    file_type = models.CharField(max_length=10)
+    total_records = models.PositiveIntegerField(default=0)
+    success_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    duplicate_count = models.PositiveIntegerField(default=0)
+    imported_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='lead_imports')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    duplicate_strategy = models.CharField(max_length=20, choices=DUPLICATE_STRATEGY_CHOICES, default='SKIP')
+    column_mapping = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Import {self.id} - {self.file_name}"
+
+
+class ImportLog(models.Model):
+    STATUS_CHOICES = [
+        ('SUCCESS', 'Success'),
+        ('FAILED', 'Failed'),
+        ('DUPLICATE', 'Duplicate'),
+        ('UPDATED', 'Updated'),
+    ]
+
+    import_history = models.ForeignKey(ImportHistory, on_delete=models.CASCADE, related_name='logs')
+    row_number = models.PositiveIntegerField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    error_message = models.TextField(blank=True)
+    row_data = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Import {self.import_history_id} Row {self.row_number} - {self.status}"
+
+
+class ImportMappingTemplate(models.Model):
+    name = models.CharField(max_length=120)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='import_mapping_templates')
+    mapping = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('name', 'created_by')
+
+    def __str__(self):
+        return f"{self.name} ({self.created_by.username})"
+
+
 class Commission(models.Model):
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),
