@@ -1046,14 +1046,14 @@ export const api = {
   },
 
   // Leads
-  async getLeads(params?: { q?: string }): Promise<Lead[]> {
-    const q = params?.q?.trim();
-    const suffix = q ? `?q=${encodeURIComponent(q)}` : '';
-    return request<Lead[]>(`/leads/${suffix}`);
+  async getLeads(): Promise<Lead[]> {
+    return request<Lead[]>('/leads/');
   },
 
   async searchLeads(query: string): Promise<Lead[]> {
-    return this.getLeads({ q: query });
+    const q = query.trim();
+    if (!q) return [];
+    return request<Lead[]>(`/leads/?q=${encodeURIComponent(q)}`);
   },
 
   async getLead(id: number): Promise<Lead> {

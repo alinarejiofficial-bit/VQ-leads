@@ -17,7 +17,7 @@ function highlightMatch(text: string, query: string) {
   );
 }
 
-: React.FC = () => {
+export const LeadSearchBar: React.FC = () => {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);

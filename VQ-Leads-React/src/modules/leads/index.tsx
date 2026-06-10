@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type User, type Lead } from '../../api';
 import { Button } from '../../components/forms/Button';
@@ -21,6 +21,7 @@ interface LeadsProps {
 export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const urlFilter = searchParams.get('filter');
   const urlQuery = searchParams.get('q') || '';
@@ -209,8 +210,8 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             <Search size={15} className="absolute left-3 top-3 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search leads..."
-              className="pl-9 w-[240px]"
+              placeholder="Search by name, phone, email, or ID…"
+              className="pl-9 w-[280px]"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -475,7 +476,14 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
       <LeadDetailsDrawer
         leadId={selectedLeadId || 0}
         isOpen={selectedLeadId !== null}
-        onClose={() => setSelectedLeadId(null)}
+        onClose={() => {
+          setSelectedLeadId(null);
+          if (urlLeadId) {
+            const next = new URLSearchParams(location.search);
+            next.delete('id');
+            navigate({ pathname: '/leads', search: next.toString() ? `?${next.toString()}` : '' }, { replace: true });
+          }
+        }}
         currentUser={user}
         agents={agents}
         onLeadUpdated={refetchLeads}
