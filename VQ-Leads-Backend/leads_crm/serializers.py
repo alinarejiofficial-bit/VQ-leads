@@ -14,7 +14,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profile', 'full_name']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profile', 'full_name', 'is_active']
 
     def get_full_name(self, obj):
         name = f"{obj.first_name} {obj.last_name}".strip()
@@ -66,10 +66,14 @@ class LeadSerializer(serializers.ModelSerializer):
 
 class LeadActivitySerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
+    lead_name = serializers.SerializerMethodField()
 
     class Meta:
         model = LeadActivity
-        fields = ['id', 'lead', 'user', 'user_name', 'activity_type', 'description', 'created_at']
+        fields = ['id', 'lead', 'lead_name', 'user', 'user_name', 'activity_type', 'description', 'created_at']
+
+    def get_lead_name(self, obj):
+        return obj.lead.name if obj.lead else ''
 
     def get_user_name(self, obj):
         if obj.user:

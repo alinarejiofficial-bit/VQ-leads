@@ -70,7 +70,11 @@ class AgentsView(APIView):
         return [permissions.IsAuthenticated()]
 
     def get(self, request):
-        agents = User.objects.filter(profile__role='AGENT', is_active=True)
+        member_roles = ['AGENT', 'LEADER']
+        if request.user.profile.role == 'ADMIN':
+            agents = User.objects.filter(profile__role__in=member_roles).order_by('first_name', 'username')
+        else:
+            agents = User.objects.filter(profile__role__in=member_roles, is_active=True)
         serializer = UserSerializer(agents, many=True)
         return Response(serializer.data)
 
@@ -81,6 +85,9 @@ class AgentsView(APIView):
         first_name = request.data.get('first_name', '')
         last_name = request.data.get('last_name', '')
         commission_rate = request.data.get('commission_rate', '10.00')
+        role = request.data.get('role', 'AGENT')
+        if role not in ('AGENT', 'LEADER'):
+            role = 'AGENT'
 
         if not username or not password:
             return Response({'error': 'Username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -98,12 +105,122 @@ class AgentsView(APIView):
         
         # Profile is created via post_save signal. We update its role & commission rate.
         profile = user.profile
-        profile.role = 'AGENT'
+        profile.role = role
         profile.commission_rate = Decimal(str(commission_rate))
         profile.save()
 
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class AgentDetailView(APIView):
+    permission_classes = [IsAdminUserRole]
+
+    def get_agent(self, pk):
+        try:
+            return User.objects.get(pk=pk, profile__role='AGENT')
+        except User.DoesNotExist:
+            return None
+
+    def patch(self, request, pk):
+        user = self.get_agent(pk)
+        if not user:
+            return Response({'error': 'Member not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if 'first_name' in request.data:
+            user.first_name = request.data['first_name']
+        if 'last_name' in request.data:
+            user.last_name = request.data['last_name']
+        if 'email' in request.data:
+            user.email = request.data['email']
+        if 'commission_rate' in request.data:
+            user.profile.commission_rate = Decimal(str(request.data['commission_rate']))
+            user.profile.save()
+        if 'is_active' in request.data:
+            user.is_active = bool(request.data['is_active'])
+
+        user.save()
+        return Response(UserSerializer(user).data)
+
+    def post(self, request, pk):
+        user = self.get_agent(pk)
+        if not user:
+            return Response({'error': 'Member not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        action = request.data.get('action')
+        if action == 'toggle_status':
+            user.is_active = not user.is_active
+            user.save()
+            return Response(UserSerializer(user).data)
+
+        if action == 'reset_password':
+            password = request.data.get('password')
+            if not password:
+                return Response({'error': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
+            user.set_password(password)
+            user.save()
+            return Response({'success': True})
+
+        return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AgentTrackingView(APIView):
+    permission_classes = [IsAdminUserRole]
+
+    def get(self, request):
+        agent_id = request.query_params.get('agent_id')
+
+        if agent_id:
+            try:
+                agent = User.objects.get(pk=agent_id, profile__role='AGENT')
+            except User.DoesNotExist:
+                return Response({'error': 'Agent not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            leads_qs = Lead.objects.filter(owner=agent)
+            activities = LeadActivity.objects.filter(
+                Q(user=agent) | Q(lead__owner=agent)
+            ).select_related('lead', 'user').order_by('-created_at')[:50]
+
+            commission_total = Commission.objects.filter(
+                agent=agent, status__in=['APPROVED', 'PAID']
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+            return Response({
+                'agent': UserSerializer(agent).data,
+                'stats': {
+                    'totalLeads': leads_qs.count(),
+                    'activeLeads': leads_qs.exclude(status__in=['WON', 'LOST']).count(),
+                    'wonLeads': leads_qs.filter(status='WON').count(),
+                    'lostLeads': leads_qs.filter(status='LOST').count(),
+                    'revenue': float(leads_qs.filter(status='WON').aggregate(total=Sum('value'))['total'] or Decimal('0.00')),
+                    'callsLogged': LeadActivity.objects.filter(user=agent, description__startswith='[CALL]').count(),
+                    'pendingTasks': Task.objects.filter(assigned_to=agent, status='PENDING').count(),
+                    'pendingFollowups': FollowUp.objects.filter(lead__owner=agent, completed=False).count(),
+                    'commissionEarned': float(commission_total),
+                },
+                'activities': LeadActivitySerializer(activities, many=True).data,
+            })
+
+        agents = User.objects.filter(profile__role='AGENT', is_active=True)
+        result = []
+        for agent in agents:
+            leads_qs = Lead.objects.filter(owner=agent)
+            last_activity = LeadActivity.objects.filter(
+                Q(user=agent) | Q(lead__owner=agent)
+            ).order_by('-created_at').first()
+
+            result.append({
+                'agent': UserSerializer(agent).data,
+                'stats': {
+                    'totalLeads': leads_qs.count(),
+                    'wonLeads': leads_qs.filter(status='WON').count(),
+                    'revenue': float(leads_qs.filter(status='WON').aggregate(total=Sum('value'))['total'] or Decimal('0.00')),
+                    'callsLogged': LeadActivity.objects.filter(user=agent, description__startswith='[CALL]').count(),
+                },
+                'lastActivityAt': last_activity.created_at.isoformat() if last_activity else None,
+            })
+
+        return Response(result)
 
 
 # Lead ViewSet

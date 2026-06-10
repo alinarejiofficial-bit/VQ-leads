@@ -26,7 +26,6 @@ import { Activities } from './modules/activities';
 import FollowUps from './modules/followups';
 import { Notifications } from './modules/notifications';
 import { AuditLogs } from './modules/audit-logs';
-
 // --- AUTH GATES ---
 interface ProtectedRouteProps {
   children: React.ReactNode;

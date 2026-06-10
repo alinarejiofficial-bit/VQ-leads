@@ -6,7 +6,8 @@ import { Button } from '../../components/forms/Button';
 import { Card } from '../../components/common/Card';
 import { Input } from '../../components/forms/Input';
 import { Dialog } from '../../components/common/Dialog';
-import { Plus } from 'lucide-react';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/datatable/Table';
+import { Plus, Pencil, KeyRound, UserCheck, UserX } from 'lucide-react';
 
 export const Teams: React.FC = () => {
   const queryClient = useQueryClient();
@@ -15,15 +16,12 @@ export const Teams: React.FC = () => {
   const tab = searchParams.get('tab') || 'members';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // New team states
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamDesc, setNewTeamDesc] = useState('');
   const [newTeamLeader, setNewTeamLeader] = useState<number | null>(null);
   const [newTeamMembers, setNewTeamMembers] = useState<number[]>([]);
 
-  // Agent Register states
-  const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [agentUser, setAgentUser] = useState('');
   const [agentPass, setAgentPass] = useState('');
   const [agentEmail, setAgentEmail] = useState('');
@@ -31,18 +29,32 @@ export const Teams: React.FC = () => {
   const [agentLast, setAgentLast] = useState('');
   const [agentComm, setAgentComm] = useState('10.00');
 
-  // React Queries
+  const [editingMember, setEditingMember] = useState<User | null>(null);
+  const [editFirst, setEditFirst] = useState('');
+  const [editLast, setEditLast] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editComm, setEditComm] = useState('10.00');
+
+  const [resetMember, setResetMember] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+
   const { data: teams = [] } = useQuery<SalesTeam[]>({
     queryKey: ['teams'],
     queryFn: api.getTeams,
   });
 
-  const { data: agents = [] } = useQuery<User[]>({
+  const { data: agents = [], isLoading: agentsLoading } = useQuery<User[]>({
     queryKey: ['agents'],
     queryFn: api.getAgents,
   });
 
-  // Mutations
+  const activeAgents = agents.filter(a => a.is_active !== false);
+
+  const invalidateAgents = () => {
+    queryClient.invalidateQueries({ queryKey: ['agents'] });
+    queryClient.invalidateQueries({ queryKey: ['agent-tracking'] });
+  };
+
   const createTeamMutation = useMutation({
     mutationFn: api.createTeam,
     onSuccess: () => {
@@ -55,11 +67,11 @@ export const Teams: React.FC = () => {
     }
   });
 
-  const registerAgentMutation = useMutation({
+  const addMemberMutation = useMutation({
     mutationFn: api.createAgent,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      setIsAgentModalOpen(false);
+      invalidateAgents();
+      setIsAddMemberOpen(false);
       setAgentUser('');
       setAgentPass('');
       setAgentEmail('');
@@ -67,16 +79,41 @@ export const Teams: React.FC = () => {
       setAgentLast('');
       setAgentComm('10.00');
     },
-    onError: (err: any) => {
-      alert(err.message || 'Registration failed');
+    onError: (err: Error) => {
+      alert(err.message || 'Failed to add member');
     }
+  });
+
+  const updateMemberMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Parameters<typeof api.updateAgent>[1] }) =>
+      api.updateAgent(id, data),
+    onSuccess: () => {
+      invalidateAgents();
+      setEditingMember(null);
+    },
+    onError: (err: Error) => alert(err.message || 'Failed to update member'),
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: api.toggleAgentStatus,
+    onSuccess: () => invalidateAgents(),
+    onError: (err: Error) => alert(err.message || 'Failed to update status'),
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({ id, password }: { id: number; password: string }) =>
+      api.resetAgentPassword(id, password),
+    onSuccess: () => {
+      setResetMember(null);
+      setNewPassword('');
+      alert('Password reset successfully');
+    },
+    onError: (err: Error) => alert(err.message || 'Failed to reset password'),
   });
 
   const deleteTeamMutation = useMutation({
     mutationFn: api.deleteTeam,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teams'] });
-    }
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['teams'] }),
   });
 
   const handleCreateTeam = (e: React.FormEvent) => {
@@ -89,9 +126,9 @@ export const Teams: React.FC = () => {
     });
   };
 
-  const handleRegisterAgent = (e: React.FormEvent) => {
+  const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault();
-    registerAgentMutation.mutate({
+    addMemberMutation.mutate({
       username: agentUser,
       password: agentPass,
       email: agentEmail,
@@ -99,6 +136,40 @@ export const Teams: React.FC = () => {
       last_name: agentLast,
       commission_rate: agentComm
     });
+  };
+
+  const openEditMember = (member: User) => {
+    setEditingMember(member);
+    setEditFirst(member.first_name);
+    setEditLast(member.last_name);
+    setEditEmail(member.email);
+    setEditComm(member.profile.commission_rate);
+  };
+
+  const handleEditMember = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMember) return;
+    updateMemberMutation.mutate({
+      id: editingMember.id,
+      data: {
+        first_name: editFirst,
+        last_name: editLast,
+        email: editEmail,
+        commission_rate: editComm,
+      },
+    });
+  };
+
+  const handleResetPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetMember || !newPassword) return;
+    resetPasswordMutation.mutate({ id: resetMember.id, password: newPassword });
+  };
+
+  const handleToggleStatus = (member: User) => {
+    const action = member.is_active !== false ? 'deactivate' : 'activate';
+    if (!window.confirm(`${action === 'deactivate' ? 'Deactivate' : 'Activate'} ${member.full_name}?`)) return;
+    toggleStatusMutation.mutate(member.id);
   };
 
   const handleMemberToggle = (id: number) => {
@@ -128,62 +199,155 @@ export const Teams: React.FC = () => {
             </a>
           ))}
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setIsAgentModalOpen(true)}>
-            <Plus size={16} className="mr-1.5" /> Register Sales Agent User
-          </Button>
-          <Button onClick={() => setIsModalOpen(true)}>
-            <Plus size={16} className="mr-1.5" /> Create Sales Team
-          </Button>
-        </div>
+        {tab === 'members' && (
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => setIsAddMemberOpen(true)}>
+              <Plus size={16} className="mr-1.5" /> Add Member
+            </Button>
+            <Button onClick={() => setIsModalOpen(true)}>
+              <Plus size={16} className="mr-1.5" /> Create Sales Team
+            </Button>
+          </div>
+        )}
       </div>
 
       {tab === 'members' && (
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {teams.map(t => (
-          <Card key={t.id} className="p-6 flex flex-col justify-between min-h-[280px]">
-            <div className="text-left">
-              <div className="flex justify-between items-start">
-                <h3 className="text-base font-semibold text-foreground leading-snug">{t.name}</h3>
-                <button 
-                  className="text-xs font-medium text-destructive hover:underline"
-                  onClick={() => handleDeleteTeam(t.id)}
-                >
-                  Delete
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2 mb-6">
-                {t.description || 'No description provided.'}
-              </p>
+        <div className="space-y-8">
+          <Card className="overflow-hidden">
+            <div className="px-6 py-4 border-b border-border/40 text-left">
+              <h3 className="text-base font-semibold text-foreground">Team Members</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Manage sales agents and their account access</p>
             </div>
-            
-            <div className="border-t border-border/40 pt-4 flex flex-col gap-3 text-left">
-              <div className="text-xs">
-                <span className="font-semibold text-foreground">Team Leader: </span>
-                <span className="text-muted-foreground">{t.leader_details?.full_name || 'Unassigned'}</span>
-              </div>
-              <div className="text-xs">
-                <span className="font-semibold text-foreground">Members ({t.members_details.length}):</span>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {t.members_details.length === 0 ? (
-                    <span className="text-muted-foreground text-[10px]">No members in team</span>
+            {agentsLoading ? (
+              <div className="p-10 text-center text-sm text-muted-foreground animate-pulse">Loading members...</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent cursor-default">
+                    <TableHead>Name</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Commission</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {agents.length === 0 ? (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
+                        No team members yet. Click &quot;Add Member&quot; to get started.
+                      </TableCell>
+                    </TableRow>
                   ) : (
-                    t.members_details.map(m => (
-                      <span 
-                        key={m.id} 
-                        className="text-[10px] font-semibold bg-muted/40 border border-border/55 px-2 py-0.5 rounded text-muted-foreground"
-                      >
-                        {m.full_name}
-                      </span>
+                    agents.map(member => (
+                      <TableRow key={member.id}>
+                        <TableCell className="font-semibold text-foreground">{member.full_name}</TableCell>
+                        <TableCell className="text-muted-foreground">@{member.username}</TableCell>
+                        <TableCell>{member.email || '—'}</TableCell>
+                        <TableCell>{member.profile.commission_rate}%</TableCell>
+                        <TableCell>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                            member.is_active !== false
+                              ? 'bg-green-500/10 border-green-500/20 text-green-400'
+                              : 'bg-red-500/10 border-red-500/20 text-red-400'
+                          }`}>
+                            {member.is_active !== false ? 'Active' : 'Inactive'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2.5 text-xs"
+                              onClick={() => openEditMember(member)}
+                              title="Edit Member"
+                            >
+                              <Pencil size={13} className="mr-1" /> Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2.5 text-xs"
+                              onClick={() => handleToggleStatus(member)}
+                              title={member.is_active !== false ? 'Deactivate' : 'Activate'}
+                            >
+                              {member.is_active !== false ? (
+                                <><UserX size={13} className="mr-1" /> Deactivate</>
+                              ) : (
+                                <><UserCheck size={13} className="mr-1" /> Activate</>
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2.5 text-xs"
+                              onClick={() => { setResetMember(member); setNewPassword(''); }}
+                              title="Reset Password"
+                            >
+                              <KeyRound size={13} className="mr-1" /> Reset
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     ))
                   )}
-                </div>
-              </div>
-            </div>
+                </TableBody>
+              </Table>
+            )}
           </Card>
-        ))}
-      </div>
+
+          <div>
+            <h3 className="text-base font-semibold text-foreground text-left mb-4">Sales Teams</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {teams.map(t => (
+                <Card key={t.id} className="p-6 flex flex-col justify-between min-h-[240px]">
+                  <div className="text-left">
+                    <div className="flex justify-between items-start">
+                      <h4 className="text-base font-semibold text-foreground leading-snug">{t.name}</h4>
+                      <button
+                        className="text-xs font-medium text-destructive hover:underline"
+                        onClick={() => handleDeleteTeam(t.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2 mb-6">
+                      {t.description || 'No description provided.'}
+                    </p>
+                  </div>
+                  <div className="border-t border-border/40 pt-4 flex flex-col gap-3 text-left">
+                    <div className="text-xs">
+                      <span className="font-semibold text-foreground">Team Leader: </span>
+                      <span className="text-muted-foreground">{t.leader_details?.full_name || 'Unassigned'}</span>
+                    </div>
+                    <div className="text-xs">
+                      <span className="font-semibold text-foreground">Members ({t.members_details.length}):</span>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {t.members_details.length === 0 ? (
+                          <span className="text-muted-foreground text-[10px]">No members in team</span>
+                        ) : (
+                          t.members_details.map(m => (
+                            <span
+                              key={m.id}
+                              className="text-[10px] font-semibold bg-muted/40 border border-border/55 px-2 py-0.5 rounded text-muted-foreground"
+                            >
+                              {m.full_name}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {tab === 'roles' && (
@@ -203,46 +367,38 @@ export const Teams: React.FC = () => {
         <form onSubmit={handleCreateTeam} className="space-y-4">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-foreground">Team Name</label>
-            <Input 
-              type="text" 
-              value={newTeamName} 
-              onChange={e => setNewTeamName(e.target.value)} 
-              required 
-            />
+            <Input type="text" value={newTeamName} onChange={e => setNewTeamName(e.target.value)} required />
           </div>
-
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-foreground">Description</label>
-            <textarea 
-              className="flex w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring min-h-[80px]" 
-              value={newTeamDesc} 
-              onChange={e => setNewTeamDesc(e.target.value)} 
+            <textarea
+              className="flex w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring min-h-[80px]"
+              value={newTeamDesc}
+              onChange={e => setNewTeamDesc(e.target.value)}
             />
           </div>
-
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-foreground">Team Leader</label>
-            <select 
+            <select
               className="flex h-10 w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
-              value={newTeamLeader || ''} 
+              value={newTeamLeader || ''}
               onChange={e => setNewTeamLeader(e.target.value ? Number(e.target.value) : null)}
             >
               <option value="">Select Leader...</option>
-              {agents.map(a => (
+              {activeAgents.map(a => (
                 <option key={a.id} value={a.id}>{a.full_name} ({a.username})</option>
               ))}
             </select>
           </div>
-
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-foreground">Select Members</label>
             <div className="flex flex-col gap-2 max-h-[140px] overflow-y-auto border border-border/80 p-3 rounded-lg bg-muted/10">
-              {agents.map(a => (
+              {activeAgents.map(a => (
                 <label key={a.id} className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     className="rounded border-input text-primary focus:ring-ring bg-muted/20 h-4 w-4"
-                    checked={newTeamMembers.includes(a.id)} 
+                    checked={newTeamMembers.includes(a.id)}
                     onChange={() => handleMemberToggle(a.id)}
                   />
                   <span>{a.full_name} ({a.username})</span>
@@ -250,7 +406,6 @@ export const Teams: React.FC = () => {
               ))}
             </div>
           </div>
-
           <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={createTeamMutation.isPending}>
@@ -260,73 +415,102 @@ export const Teams: React.FC = () => {
         </form>
       </Dialog>
 
-      {/* Register Agent Modal */}
-      <Dialog isOpen={isAgentModalOpen} onClose={() => setIsAgentModalOpen(false)} title="Register Sales Agent User">
-        <form onSubmit={handleRegisterAgent} className="space-y-4">
+      {/* Add Member Modal */}
+      <Dialog isOpen={isAddMemberOpen} onClose={() => setIsAddMemberOpen(false)} title="Add Member">
+        <form onSubmit={handleAddMember} className="space-y-4">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-foreground">Username *</label>
-            <Input 
-              type="text" 
-              value={agentUser} 
-              onChange={e => setAgentUser(e.target.value)} 
-              required 
-            />
+            <Input type="text" value={agentUser} onChange={e => setAgentUser(e.target.value)} required />
           </div>
-
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-foreground">Password *</label>
-            <Input 
-              type="password" 
-              value={agentPass} 
-              onChange={e => setAgentPass(e.target.value)} 
-              required 
-            />
+            <Input type="password" value={agentPass} onChange={e => setAgentPass(e.target.value)} required />
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">First Name</label>
-              <Input 
-                type="text" 
-                value={agentFirst} 
-                onChange={e => setAgentFirst(e.target.value)} 
-              />
+              <Input type="text" value={agentFirst} onChange={e => setAgentFirst(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Last Name</label>
-              <Input 
-                type="text" 
-                value={agentLast} 
-                onChange={e => setAgentLast(e.target.value)} 
-              />
+              <Input type="text" value={agentLast} onChange={e => setAgentLast(e.target.value)} />
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Email</label>
-              <Input 
-                type="email" 
-                value={agentEmail} 
-                onChange={e => setAgentEmail(e.target.value)} 
-              />
+              <Input type="email" value={agentEmail} onChange={e => setAgentEmail(e.target.value)} />
             </div>
-
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-foreground">Commission Rate (%)</label>
-              <Input 
-                type="number" 
-                step="0.01"
-                value={agentComm} 
-                onChange={e => setAgentComm(e.target.value)} 
-              />
+              <Input type="number" step="0.01" value={agentComm} onChange={e => setAgentComm(e.target.value)} />
             </div>
           </div>
-
           <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
-            <Button type="button" variant="outline" onClick={() => setIsAgentModalOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={registerAgentMutation.isPending}>
-              {registerAgentMutation.isPending ? 'Registering...' : 'Register Agent'}
+            <Button type="button" variant="outline" onClick={() => setIsAddMemberOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={addMemberMutation.isPending}>
+              {addMemberMutation.isPending ? 'Adding...' : 'Add Member'}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* Edit Member Modal */}
+      <Dialog isOpen={!!editingMember} onClose={() => setEditingMember(null)} title="Edit Member">
+        <form onSubmit={handleEditMember} className="space-y-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Username</label>
+            <Input type="text" value={editingMember?.username || ''} disabled />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">First Name</label>
+              <Input type="text" value={editFirst} onChange={e => setEditFirst(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Last Name</label>
+              <Input type="text" value={editLast} onChange={e => setEditLast(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Email</label>
+              <Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Commission Rate (%)</label>
+              <Input type="number" step="0.01" value={editComm} onChange={e => setEditComm(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+            <Button type="button" variant="outline" onClick={() => setEditingMember(null)}>Cancel</Button>
+            <Button type="submit" disabled={updateMemberMutation.isPending}>
+              {updateMemberMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* Reset Password Modal */}
+      <Dialog isOpen={!!resetMember} onClose={() => setResetMember(null)} title="Reset Password">
+        <form onSubmit={handleResetPassword} className="space-y-4">
+          <p className="text-sm text-muted-foreground text-left">
+            Set a new password for <span className="font-semibold text-foreground">{resetMember?.full_name}</span>
+          </p>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">New Password *</label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              required
+              minLength={6}
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+            <Button type="button" variant="outline" onClick={() => setResetMember(null)}>Cancel</Button>
+            <Button type="submit" disabled={resetPasswordMutation.isPending}>
+              {resetPasswordMutation.isPending ? 'Resetting...' : 'Reset Password'}
             </Button>
           </div>
         </form>
@@ -334,4 +518,5 @@ export const Teams: React.FC = () => {
     </div>
   );
 };
+
 export default Teams;

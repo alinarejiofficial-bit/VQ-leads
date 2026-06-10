@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    LoginView, LogoutView, MeView, AgentsView, LeadViewSet,
+    LoginView, LogoutView, MeView, AgentsView, AgentDetailView, AgentTrackingView, LeadViewSet,
     SalesTeamViewSet, LeadFormViewSet, PublicFormDetailView,
     PublicFormSubmitView, TaskViewSet, FollowUpViewSet,
     CommissionViewSet, DashboardStatsView, DashboardChartsView, AgentDashboardView
@@ -23,6 +23,8 @@ urlpatterns = [
 
     # Agents endpoints
     path('agents/', AgentsView.as_view(), name='agents'),
+    path('agents/tracking/', AgentTrackingView.as_view(), name='agent_tracking'),
+    path('agents/<int:pk>/', AgentDetailView.as_view(), name='agent_detail'),
 
     # Public form endpoints (Unauthenticated)
     path('public/forms/<int:pk>/', PublicFormDetailView.as_view(), name='public_form_detail'),

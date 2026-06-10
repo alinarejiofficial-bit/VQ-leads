@@ -126,8 +126,8 @@ export const Sidebar: React.FC = () => {
         { label: 'Performance', path: '/teams?tab=performance' },
       ]
     },
-    { 
-      path: '/commissions', 
+    {
+      path: '/commissions',
       label: 'Commissions', 
       icon: DollarSign, 
       roles: ['ADMIN', 'LEADER', 'AGENT'] 

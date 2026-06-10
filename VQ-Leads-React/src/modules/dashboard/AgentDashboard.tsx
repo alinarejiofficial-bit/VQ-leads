@@ -1,10 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { api, type User, type AgentDashboardData, type Lead } from '../../api';
-import { MyLeadsPipeline } from '../leads/components/MyLeadsPipeline';
-import { LeadDetailsDrawer } from '../leads/components/LeadDetailsDrawer';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { api, type User, type AgentDashboardData } from '../../api';
 import { LineChart, DonutChart, BarChart } from '../../components/charts/CustomCharts';
 import { Card } from '../../components/common/Card';
 import {
@@ -45,30 +42,11 @@ const KPI_CARDS = [
 
 export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [selectedLeadId, setSelectedLeadId] = React.useState<number | null>(null);
 
   const { data, isLoading } = useQuery<AgentDashboardData>({
     queryKey: ['agent-dashboard'],
     queryFn: api.getAgentDashboard,
   });
-
-  const { data: leads = [] } = useQuery<Lead[]>({
-    queryKey: ['leads'],
-    queryFn: api.getLeads,
-  });
-
-  const updateLeadMutation = useMutation({
-    mutationFn: ({ id, data: leadData }: { id: number; data: Partial<Lead> }) => api.updateLead(id, leadData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
-    },
-  });
-
-  const myPipelineLeads = leads.filter(
-    l => l.owner === user.id && l.status !== 'WON' && l.status !== 'LOST'
-  );
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
@@ -224,16 +202,6 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
         </Card>
       </div>
 
-      {/* My Leads Pipeline */}
-      {myPipelineLeads.length > 0 && (
-        <MyLeadsPipeline
-          leads={myPipelineLeads}
-          onStatusChange={(id, status) => updateLeadMutation.mutate({ id, data: { status: status as Lead['status'] } })}
-          onEdit={setSelectedLeadId}
-          isUpdating={updateLeadMutation.isPending}
-        />
-      )}
-
       {/* Hot Leads */}
       <Card className="overflow-hidden text-left">
         <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2 bg-gradient-to-r from-orange-500/10 to-transparent">
@@ -366,17 +334,6 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
         </Card>
       </div>
 
-      <LeadDetailsDrawer
-        leadId={selectedLeadId || 0}
-        isOpen={selectedLeadId !== null}
-        onClose={() => setSelectedLeadId(null)}
-        currentUser={user}
-        agents={[]}
-        onLeadUpdated={() => {
-          queryClient.invalidateQueries({ queryKey: ['leads'] });
-          queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
-        }}
-      />
     </div>
   );
 };

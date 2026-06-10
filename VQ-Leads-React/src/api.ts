@@ -14,6 +14,7 @@ export interface User {
   last_name: string;
   profile: UserProfile;
   full_name: string;
+  is_active?: boolean;
 }
 
 export interface SalesTeam {
@@ -60,11 +61,37 @@ export interface Lead {
 export interface LeadActivity {
   id: number;
   lead: number;
+  lead_name?: string;
   user: number | null;
   user_name: string;
   activity_type: string;
   description: string;
   created_at: string;
+}
+
+export interface AgentTrackingStats {
+  totalLeads: number;
+  wonLeads: number;
+  revenue: number;
+  callsLogged: number;
+}
+
+export interface AgentTrackingItem {
+  agent: User;
+  stats: AgentTrackingStats;
+  lastActivityAt: string | null;
+}
+
+export interface AgentTrackingDetail {
+  agent: User;
+  stats: AgentTrackingStats & {
+    activeLeads: number;
+    lostLeads: number;
+    pendingTasks: number;
+    pendingFollowups: number;
+    commissionEarned: number;
+  };
+  activities: LeadActivity[];
 }
 
 export interface FollowUp {
@@ -276,6 +303,35 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(agentData),
     });
+  },
+
+  async updateAgent(id: number, data: Partial<User> & { commission_rate?: string }): Promise<User> {
+    return request<User>(`/agents/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async toggleAgentStatus(id: number): Promise<User> {
+    return request<User>(`/agents/${id}/`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'toggle_status' }),
+    });
+  },
+
+  async resetAgentPassword(id: number, password: string): Promise<void> {
+    return request<void>(`/agents/${id}/`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reset_password', password }),
+    });
+  },
+
+  async getAgentTracking(): Promise<AgentTrackingItem[]> {
+    return request<AgentTrackingItem[]>('/agents/tracking/');
+  },
+
+  async getAgentTrackingDetail(agentId: number): Promise<AgentTrackingDetail> {
+    return request<AgentTrackingDetail>(`/agents/tracking/?agent_id=${agentId}`);
   },
 
   // Leads

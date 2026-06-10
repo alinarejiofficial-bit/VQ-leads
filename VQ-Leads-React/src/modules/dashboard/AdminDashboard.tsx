@@ -1,11 +1,23 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api, type DashboardStats, type DashboardCharts } from '../../api';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api, type DashboardStats, type DashboardCharts, type User } from '../../api';
 import { LineChart, DonutChart } from '../../components/charts/CustomCharts';
 import { Card } from '../../components/common/Card';
-import { Briefcase, TrendingUp, DollarSign } from 'lucide-react';
+import { Button } from '../../components/forms/Button';
+import { Input } from '../../components/forms/Input';
+import { Dialog } from '../../components/common/Dialog';
+import { Briefcase, TrendingUp, DollarSign, Users, Plus } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
+  const queryClient = useQueryClient();
+  const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
+  const [agentUser, setAgentUser] = useState('');
+  const [agentPass, setAgentPass] = useState('');
+  const [agentEmail, setAgentEmail] = useState('');
+  const [agentFirst, setAgentFirst] = useState('');
+  const [agentLast, setAgentLast] = useState('');
+  const [agentComm, setAgentComm] = useState('10.00');
+
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: api.getDashboardStats,
@@ -15,6 +27,40 @@ export const AdminDashboard: React.FC = () => {
     queryKey: ['dashboard-charts'],
     queryFn: api.getDashboardCharts,
   });
+
+  const { data: agents = [] } = useQuery<User[]>({
+    queryKey: ['agents'],
+    queryFn: api.getAgents,
+  });
+
+  const registerAgentMutation = useMutation({
+    mutationFn: api.createAgent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      setIsAgentModalOpen(false);
+      setAgentUser('');
+      setAgentPass('');
+      setAgentEmail('');
+      setAgentFirst('');
+      setAgentLast('');
+      setAgentComm('10.00');
+    },
+    onError: (err: Error) => {
+      alert(err.message || 'Failed to add agent');
+    },
+  });
+
+  const handleRegisterAgent = (e: React.FormEvent) => {
+    e.preventDefault();
+    registerAgentMutation.mutate({
+      username: agentUser,
+      password: agentPass,
+      email: agentEmail,
+      first_name: agentFirst,
+      last_name: agentLast,
+      commission_rate: agentComm,
+    });
+  };
 
   if (statsLoading || chartsLoading) {
     return (
@@ -39,6 +85,16 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Admin Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Overview of leads, agents, and performance</p>
+        </div>
+        <Button onClick={() => setIsAgentModalOpen(true)}>
+          <Plus size={16} className="mr-1.5" /> Add Agent
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="flex items-center justify-between p-6">
           <div className="flex flex-col text-left">
@@ -99,6 +155,43 @@ export const AdminDashboard: React.FC = () => {
         </Card>
       </div>
 
+      <Card className="p-6 text-left">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Users size={18} className="text-primary" />
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Sales Agents</h3>
+              <p className="text-xs text-muted-foreground">{agents.length} active agent{agents.length !== 1 ? 's' : ''} registered</p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setIsAgentModalOpen(true)}>
+            <Plus size={14} className="mr-1" /> Add Agent
+          </Button>
+        </div>
+        {agents.length === 0 ? (
+          <div className="text-center py-8 border border-dashed border-border/60 rounded-xl">
+            <p className="text-sm text-muted-foreground mb-3">No agents yet. Add your first sales agent to get started.</p>
+            <Button size="sm" onClick={() => setIsAgentModalOpen(true)}>
+              <Plus size={14} className="mr-1" /> Add Agent
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {agents.map(agent => (
+              <div key={agent.id} className="flex items-center gap-3 p-3 rounded-lg border border-border/40 bg-muted/10">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center font-bold text-white text-sm shrink-0">
+                  {agent.first_name ? agent.first_name[0] : agent.username[0].toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{agent.full_name}</p>
+                  <p className="text-[10px] text-muted-foreground">@{agent.username} · {agent.profile.commission_rate}% comm.</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-6">
           <div className="mb-6 text-left">
@@ -158,6 +251,45 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      <Dialog isOpen={isAgentModalOpen} onClose={() => setIsAgentModalOpen(false)} title="Add Sales Agent">
+        <form onSubmit={handleRegisterAgent} className="space-y-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Username *</label>
+            <Input type="text" value={agentUser} onChange={e => setAgentUser(e.target.value)} required />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Password *</label>
+            <Input type="password" value={agentPass} onChange={e => setAgentPass(e.target.value)} required />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">First Name</label>
+              <Input type="text" value={agentFirst} onChange={e => setAgentFirst(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Last Name</label>
+              <Input type="text" value={agentLast} onChange={e => setAgentLast(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Email</label>
+              <Input type="email" value={agentEmail} onChange={e => setAgentEmail(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground">Commission Rate (%)</label>
+              <Input type="number" step="0.01" value={agentComm} onChange={e => setAgentComm(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+            <Button type="button" variant="outline" onClick={() => setIsAgentModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={registerAgentMutation.isPending}>
+              {registerAgentMutation.isPending ? 'Adding...' : 'Add Agent'}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 };
