@@ -248,6 +248,31 @@ class FollowUp(models.Model):
 
 
 class Task(models.Model):
+    TASK_TYPE_CHOICES = [
+        ('CALL_LEAD', 'Call Lead'),
+        ('FOLLOW_UP', 'Follow-Up'),
+        ('MEETING', 'Meeting'),
+        ('SITE_VISIT', 'Site Visit'),
+        ('SEND_EMAIL', 'Send Email'),
+        ('SEND_QUOTATION', 'Send Quotation'),
+        ('DOCUMENT_COLLECTION', 'Document Collection'),
+        ('PAYMENT_FOLLOW_UP', 'Payment Follow-Up'),
+        ('CUSTOM', 'Custom Task'),
+    ]
+    PRIORITY_CHOICES = [
+        ('LOW', 'Low'),
+        ('MEDIUM', 'Medium'),
+        ('HIGH', 'High'),
+        ('URGENT', 'Urgent'),
+    ]
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('IN_PROGRESS', 'In Progress'),
+        ('COMPLETED', 'Completed'),
+        ('CANCELLED', 'Cancelled'),
+        ('OVERDUE', 'Overdue'),
+    ]
+
     lead = models.ForeignKey(
         Lead,
         on_delete=models.SET_NULL,
@@ -257,16 +282,24 @@ class Task(models.Model):
     )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    task_type = models.CharField(max_length=30, choices=TASK_TYPE_CHOICES, default='CUSTOM')
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='MEDIUM')
     due_date = models.DateTimeField(null=True, blank=True)
+    reminder_time = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
     assigned_to = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='assigned_tasks'
     )
-    status = models.CharField(
-        max_length=20,
-        choices=[('PENDING', 'Pending'), ('COMPLETED', 'Completed')],
-        default='PENDING'
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='completed_tasks'
     )
     created_by = models.ForeignKey(
         User,
@@ -275,9 +308,32 @@ class Task(models.Model):
         related_name='created_tasks'
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title
+
+
+class TaskComment(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
+    comment = models.TextField()
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='task_comments')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Comment on {self.task.title} by {self.user.username}"
+
+
+class TaskHistory(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='history')
+    action = models.CharField(max_length=100)
+    old_value = models.TextField(blank=True)
+    new_value = models.TextField(blank=True)
+    performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='task_history')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.action} on {self.task.title}"
 
 
 class Notification(models.Model):

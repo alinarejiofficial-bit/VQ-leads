@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type ExportHistoryItem, type ExportPreviewResponse, type ExportStats, type Lead, type User } from '../../../api';
 import { Card } from '../../../components/common/Card';
@@ -16,6 +16,7 @@ const STATUS_OPTIONS = ['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL_SENT', 'NEGOT
 const SOURCE_OPTIONS = ['Website', 'Facebook Ads', 'Google Ads', 'Referral', 'Manual Entry'];
 
 export const ExportModule: React.FC<ExportModuleProps> = ({ leads }) => {
+  void leads;
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -53,8 +54,6 @@ export const ExportModule: React.FC<ExportModuleProps> = ({ leads }) => {
       fileType: fileTypeFilter || undefined,
     }),
   });
-
-  const filteredLeads = useMemo(() => leads, [leads]);
 
   const previewMutation = useMutation({
     mutationFn: () => api.previewLeadExport({

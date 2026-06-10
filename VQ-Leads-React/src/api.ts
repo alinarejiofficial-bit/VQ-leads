@@ -48,7 +48,7 @@ export interface Lead {
   email: string;
   phone: string;
   company: string;
-  status: 'NEW' | 'AVAILABLE' | 'CLAIMED' | 'CONTACTED' | 'QUALIFIED' | 'FOLLOW_UP' | 'PROPOSAL_SENT' | 'NEGOTIATION' | 'CONVERTED' | 'LOST' | 'DUPLICATE' | 'INVALID';
+  status: 'NEW' | 'AVAILABLE' | 'CLAIMED' | 'CONTACTED' | 'IN_PROGRESS' | 'QUALIFIED' | 'FOLLOW_UP' | 'PROPOSAL_SENT' | 'NEGOTIATION' | 'CONVERTED' | 'WON' | 'LOST' | 'DUPLICATE' | 'INVALID';
   source: string;
   value: string;
   owner: number | null;
@@ -213,19 +213,67 @@ export interface FollowUp {
   created_at: string;
 }
 
+export type TaskType =
+  | 'CALL_LEAD' | 'FOLLOW_UP' | 'MEETING' | 'SITE_VISIT' | 'SEND_EMAIL'
+  | 'SEND_QUOTATION' | 'DOCUMENT_COLLECTION' | 'PAYMENT_FOLLOW_UP' | 'CUSTOM';
+
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'OVERDUE';
+
 export interface Task {
   id: number;
   lead: number | null;
   lead_name: string;
   title: string;
   description: string;
+  task_type: TaskType;
+  priority: TaskPriority;
   due_date: string | null;
+  reminder_time: string | null;
+  notes: string;
   assigned_to: number;
   assigned_to_details: User | null;
-  status: 'PENDING' | 'COMPLETED';
+  status: TaskStatus;
+  is_overdue: boolean;
+  completed_at: string | null;
+  completed_by: number | null;
+  completed_by_name: string;
   created_by: number | null;
   created_by_name: string;
   created_at: string;
+  updated_at: string;
+}
+
+export interface TaskComment {
+  id: number;
+  task: number;
+  comment: string;
+  user: number;
+  user_name: string;
+  created_at: string;
+}
+
+export interface TaskHistoryItem {
+  id: number;
+  task: number;
+  action: string;
+  old_value: string;
+  new_value: string;
+  performed_by: number | null;
+  performed_by_name: string;
+  created_at: string;
+}
+
+export interface TaskWidgetStats {
+  totalTasks: number;
+  pendingTasks: number;
+  completedTasks: number;
+  overdueTasks: number;
+  tasksDueToday: number;
+  highPriorityTasks: number;
+  completedToday: number;
+  completedThisWeek: number;
+  completedThisMonth: number;
 }
 
 export interface Commission {
@@ -769,8 +817,16 @@ export const api = {
   },
 
   // Tasks
-  async getTasks(): Promise<Task[]> {
-    return request<Task[]>('/tasks/');
+  async getTasks(params?: {
+    q?: string; status?: string; priority?: string; task_type?: string;
+    assigned_to?: number; lead?: number; due?: string;
+  }): Promise<Task[]> {
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
+    });
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<Task[]>(`/tasks/${suffix}`);
   },
 
   async createTask(task: Partial<Task>): Promise<Task> {
@@ -788,9 +844,23 @@ export const api = {
   },
 
   async deleteTask(id: number): Promise<void> {
-    return request<void>(`/tasks/${id}/`, {
-      method: 'DELETE',
-    });
+    return request<void>(`/tasks/${id}/`, { method: 'DELETE' });
+  },
+
+  async getTaskWidgetStats(): Promise<TaskWidgetStats> {
+    return request<TaskWidgetStats>('/tasks/widgets/');
+  },
+
+  async getTaskComments(taskId: number): Promise<TaskComment[]> {
+    return request<TaskComment[]>(`/task-comments/?task=${taskId}`);
+  },
+
+  async createTaskComment(payload: { task: number; comment: string }): Promise<TaskComment> {
+    return request<TaskComment>('/task-comments/', { method: 'POST', body: JSON.stringify(payload) });
+  },
+
+  async getTaskHistory(taskId: number): Promise<TaskHistoryItem[]> {
+    return request<TaskHistoryItem[]>(`/task-history/?task=${taskId}`);
   },
 
   // Follow-ups

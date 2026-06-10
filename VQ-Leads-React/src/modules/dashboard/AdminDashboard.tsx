@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { api, type DashboardStats, type DashboardCharts, type User } from '../../api';
 import { LineChart, DonutChart } from '../../components/charts/CustomCharts';
 import { Card } from '../../components/common/Card';
-import { Button } from '../../components/forms/Button';
 import { Briefcase, TrendingUp, DollarSign, Users } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {

@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from .models import (
     UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task,
     Commission, Notification, ImportHistory, ImportLog, ImportMappingTemplate, ExportHistory,
-    CallLog, LeadNote, LeadEmail
+    CallLog, LeadNote, LeadEmail, TaskComment, TaskHistory
 )
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -114,17 +114,48 @@ class FollowUpSerializer(serializers.ModelSerializer):
         return 'OVERDUE' if obj.scheduled_time < timezone.now() else 'PENDING'
 
 
+class TaskCommentSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TaskComment
+        fields = ['id', 'task', 'comment', 'user', 'user_name', 'created_at']
+        read_only_fields = ['user']
+
+    def get_user_name(self, obj):
+        name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return name if name else obj.user.username
+
+
+class TaskHistorySerializer(serializers.ModelSerializer):
+    performed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TaskHistory
+        fields = ['id', 'task', 'action', 'old_value', 'new_value', 'performed_by', 'performed_by_name', 'created_at']
+
+    def get_performed_by_name(self, obj):
+        if obj.performed_by:
+            name = f"{obj.performed_by.first_name} {obj.performed_by.last_name}".strip()
+            return name if name else obj.performed_by.username
+        return 'System'
+
+
 class TaskSerializer(serializers.ModelSerializer):
     assigned_to_details = UserSerializer(source='assigned_to', read_only=True)
     created_by_name = serializers.SerializerMethodField()
+    completed_by_name = serializers.SerializerMethodField()
     lead_name = serializers.ReadOnlyField(source='lead.name')
+    is_overdue = serializers.SerializerMethodField()
 
     class Meta:
         model = Task
         fields = [
-            'id', 'lead', 'lead_name', 'title', 'description', 'due_date',
-            'assigned_to', 'assigned_to_details', 'status', 'created_by',
-            'created_by_name', 'created_at'
+            'id', 'lead', 'lead_name', 'title', 'description', 'task_type', 'priority',
+            'due_date', 'reminder_time', 'notes',
+            'assigned_to', 'assigned_to_details', 'status', 'is_overdue',
+            'completed_at', 'completed_by', 'completed_by_name',
+            'created_by', 'created_by_name', 'created_at', 'updated_at'
         ]
 
     def get_created_by_name(self, obj):
@@ -132,6 +163,18 @@ class TaskSerializer(serializers.ModelSerializer):
             name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
             return name if name else obj.created_by.username
         return "System"
+
+    def get_completed_by_name(self, obj):
+        if obj.completed_by:
+            name = f"{obj.completed_by.first_name} {obj.completed_by.last_name}".strip()
+            return name if name else obj.completed_by.username
+        return ""
+
+    def get_is_overdue(self, obj):
+        from django.utils import timezone
+        if obj.status in ('COMPLETED', 'CANCELLED'):
+            return False
+        return bool(obj.due_date and obj.due_date < timezone.now())
 
 
 class CommissionSerializer(serializers.ModelSerializer):

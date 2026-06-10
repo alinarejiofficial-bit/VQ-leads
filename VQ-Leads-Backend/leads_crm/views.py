@@ -748,17 +748,96 @@ class TaskViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
+        from .task_views import record_task_history
         task = self.get_object()
         old_status = task.status
-        updated_task = serializer.save()
+        old_priority = task.priority
+        old_assigned = task.assigned_to_id
 
-        if old_status != updated_task.status and updated_task.lead:
-            LeadActivity.objects.create(
+        # Auto-set completed_at / completed_by
+        new_status = serializer.validated_data.get('status', old_status)
+        extra = {}
+        if new_status == 'COMPLETED' and old_status != 'COMPLETED':
+            extra['completed_at'] = timezone.now()
+            extra['completed_by'] = self.request.user
+        elif new_status != 'COMPLETED':
+            extra['completed_at'] = None
+            extra['completed_by'] = None
+
+        updated_task = serializer.save(**extra)
+
+        if old_status != updated_task.status:
+            record_task_history(updated_task, 'STATUS_CHANGED', old_status, updated_task.status, self.request.user)
+            if updated_task.lead:
+                LeadActivity.objects.create(
+                    lead=updated_task.lead,
+                    user=self.request.user,
+                    activity_type='TASK_COMPLETED' if updated_task.status == 'COMPLETED' else 'TASK_UPDATED',
+                    description=f"Task '{updated_task.title}' marked as {updated_task.status}."
+                )
+
+        if old_priority != updated_task.priority:
+            record_task_history(updated_task, 'PRIORITY_CHANGED', old_priority, updated_task.priority, self.request.user)
+
+        if old_assigned != updated_task.assigned_to_id:
+            record_task_history(updated_task, 'REASSIGNED', str(old_assigned), str(updated_task.assigned_to_id), self.request.user)
+            create_notification(
+                recipient=updated_task.assigned_to,
+                notif_type='TASK_ASSIGNED',
+                title='Task Assigned',
+                message=f"Task '{updated_task.title}' was reassigned to you.",
                 lead=updated_task.lead,
-                user=self.request.user,
-                activity_type='TASK_COMPLETED' if updated_task.status == 'COMPLETED' else 'TASK_REOPENED',
-                description=f"Task '{updated_task.title}' marked as {updated_task.status}."
+                task=updated_task
             )
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return Task.objects.none()
+
+        qs = Task.objects.all() if user.profile.role == 'ADMIN' \
+            else Task.objects.filter(Q(assigned_to=user) | Q(created_by=user))
+
+        # Auto-mark overdue
+        qs.filter(
+            status__in=['PENDING', 'IN_PROGRESS'],
+            due_date__lt=timezone.now()
+        ).update(status='OVERDUE')
+
+        status_filter = self.request.query_params.get('status')
+        priority_filter = self.request.query_params.get('priority')
+        task_type_filter = self.request.query_params.get('task_type')
+        assigned_filter = self.request.query_params.get('assigned_to')
+        lead_filter = self.request.query_params.get('lead')
+        search = self.request.query_params.get('q')
+        due_filter = self.request.query_params.get('due')
+
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if priority_filter:
+            qs = qs.filter(priority=priority_filter)
+        if task_type_filter:
+            qs = qs.filter(task_type=task_type_filter)
+        if assigned_filter:
+            qs = qs.filter(assigned_to_id=assigned_filter)
+        if lead_filter:
+            qs = qs.filter(lead_id=lead_filter)
+        if search:
+            qs = qs.filter(Q(title__icontains=search) | Q(description__icontains=search))
+        if due_filter == 'today':
+            qs = qs.filter(due_date__date=timezone.now().date())
+        elif due_filter == 'tomorrow':
+            tomorrow = (timezone.now() + timezone.timedelta(days=1)).date()
+            qs = qs.filter(due_date__date=tomorrow)
+        elif due_filter == 'this_week':
+            week_end = timezone.now() + timezone.timedelta(days=7)
+            qs = qs.filter(due_date__lte=week_end)
+        elif due_filter == 'overdue':
+            qs = qs.filter(status='OVERDUE')
+        elif due_filter == 'high_priority':
+            qs = qs.filter(priority__in=['HIGH', 'URGENT'])
+
+        return qs.order_by('due_date')
 
 
 # FollowUp ViewSet

@@ -4,14 +4,8 @@ from rest_framework import permissions, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Lead, LeadActivity, CallLog, LeadNote, LeadEmail, FollowUp
-from .serializers import LeadActivitySerializer, CallLogSerializer, LeadNoteSerializer, LeadEmailSerializer, FollowUpSerializer
-
-
-def user_can_access_lead(user, lead):
-    if user.profile.role == 'ADMIN':
-        return True
-    return lead.owner_id == user.id or lead.owner_id is None
+from .models import LeadActivity, CallLog, LeadNote, LeadEmail, FollowUp
+from .serializers import LeadActivitySerializer, CallLogSerializer, LeadNoteSerializer, LeadEmailSerializer
 
 
 def log_activity(lead, activity_type, description, user):

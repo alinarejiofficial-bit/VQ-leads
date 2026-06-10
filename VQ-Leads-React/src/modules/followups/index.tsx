@@ -65,14 +65,44 @@ export const FollowUpsList: React.FC = () => {
   }
 
   if (view === 'calendar') {
+    const groupedByDay = pendingReminders.reduce<Record<string, FollowUp[]>>((acc, item) => {
+      const key = item.scheduled_time ? new Date(item.scheduled_time).toDateString() : 'Unscheduled';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {});
+
     return (
       <Card className="p-6 flex flex-col h-[calc(100vh-140px)] overflow-hidden">
         <div className="flex items-center gap-2 mb-6 border-b border-border/40 pb-3 text-left">
           <Calendar className="text-blue-400" size={20} />
           <h3 className="text-base font-semibold text-foreground">Follow-ups Calendar View</h3>
         </div>
-        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          Calendar view placeholder.
+        <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+          {Object.keys(groupedByDay).length === 0 ? (
+            <div className="text-center text-xs text-muted-foreground py-8 border border-dashed border-border/60 rounded-lg">
+              No follow-ups on calendar.
+            </div>
+          ) : (
+            Object.entries(groupedByDay).map(([dateLabel, items]) => (
+              <div key={dateLabel} className="rounded-lg border border-border/50 bg-muted/10 p-3 text-left">
+                <p className="text-xs font-semibold text-foreground mb-2">{dateLabel}</p>
+                <div className="space-y-2">
+                  {items.map(item => (
+                    <div key={item.id} className="flex items-start justify-between gap-2 p-2 rounded border border-border/40 bg-background/70">
+                      <div>
+                        <p className="text-sm text-foreground font-medium">{item.lead_name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{item.followup_type || 'CALL'} · {item.notes || 'No notes'}</p>
+                      </div>
+                      <button type="button" className="text-[10px] text-primary hover:underline" onClick={() => handleReschedule(item)}>
+                        Reschedule
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </Card>
     );
