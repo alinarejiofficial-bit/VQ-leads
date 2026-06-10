@@ -2,7 +2,8 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
     UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task,
-    Commission, Notification, ImportHistory, ImportLog, ImportMappingTemplate, ExportHistory
+    Commission, Notification, ImportHistory, ImportLog, ImportMappingTemplate, ExportHistory,
+    CallLog, LeadNote, LeadEmail
 )
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -92,14 +93,25 @@ class LeadActivitySerializer(serializers.ModelSerializer):
 class FollowUpSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
     lead_name = serializers.ReadOnlyField(source='lead.name')
+    assigned_agent_details = UserSerializer(source='assigned_agent', read_only=True)
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = FollowUp
-        fields = ['id', 'lead', 'lead_name', 'scheduled_time', 'notes', 'completed', 'created_by', 'created_by_name', 'created_at']
+        fields = [
+            'id', 'lead', 'lead_name', 'scheduled_time', 'followup_type', 'notes', 'completed',
+            'status', 'created_by', 'created_by_name', 'assigned_agent', 'assigned_agent_details', 'created_at'
+        ]
 
     def get_created_by_name(self, obj):
         name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
         return name if name else obj.created_by.username
+
+    def get_status(self, obj):
+        if obj.completed:
+            return 'COMPLETED'
+        from django.utils import timezone
+        return 'OVERDUE' if obj.scheduled_time < timezone.now() else 'PENDING'
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -217,3 +229,62 @@ class ExportHistorySerializer(serializers.ModelSerializer):
             name = f"{obj.exported_by.first_name} {obj.exported_by.last_name}".strip()
             return name if name else obj.exported_by.username
         return ''
+
+
+class CallLogSerializer(serializers.ModelSerializer):
+    lead_name = serializers.ReadOnlyField(source='lead.name')
+    agent_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CallLog
+        fields = [
+            'id', 'lead', 'lead_name', 'agent', 'agent_name', 'call_date', 'duration',
+            'call_type', 'call_status', 'outcome', 'notes', 'created_at', 'updated_at'
+        ]
+
+    def get_agent_name(self, obj):
+        name = f"{obj.agent.first_name} {obj.agent.last_name}".strip()
+        return name if name else obj.agent.username
+
+
+class LeadNoteSerializer(serializers.ModelSerializer):
+    lead_name = serializers.ReadOnlyField(source='lead.name')
+    created_by_name = serializers.SerializerMethodField()
+    mention_user_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
+
+    class Meta:
+        model = LeadNote
+        fields = [
+            'id', 'lead', 'lead_name', 'title', 'content', 'is_pinned',
+            'created_by', 'created_by_name', 'mention_user_ids', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_by']
+
+    def get_created_by_name(self, obj):
+        name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+        return name if name else obj.created_by.username
+
+    def create(self, validated_data):
+        mention_ids = validated_data.pop('mention_user_ids', [])
+        note = super().create(validated_data)
+        if mention_ids:
+            note.mentions.set(User.objects.filter(id__in=mention_ids))
+        return note
+
+    def update(self, instance, validated_data):
+        mention_ids = validated_data.pop('mention_user_ids', None)
+        note = super().update(instance, validated_data)
+        if mention_ids is not None:
+            note.mentions.set(User.objects.filter(id__in=mention_ids))
+        return note
+
+
+class LeadEmailSerializer(serializers.ModelSerializer):
+    lead_name = serializers.ReadOnlyField(source='lead.name')
+
+    class Meta:
+        model = LeadEmail
+        fields = [
+            'id', 'lead', 'lead_name', 'subject', 'sender', 'recipient', 'status',
+            'direction', 'content', 'attachments', 'sent_at', 'created_at', 'updated_at'
+        ]

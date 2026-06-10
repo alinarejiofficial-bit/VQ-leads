@@ -774,12 +774,15 @@ class FollowUpViewSet(viewsets.ModelViewSet):
         return FollowUp.objects.filter(lead__owner=user).order_by('scheduled_time')
 
     def perform_create(self, serializer):
-        followup = serializer.save(created_by=self.request.user)
+        followup = serializer.save(
+            created_by=self.request.user,
+            assigned_agent=serializer.validated_data.get('assigned_agent') or self.request.user
+        )
         LeadActivity.objects.create(
             lead=followup.lead,
             user=self.request.user,
             activity_type='FOLLOW_UP_SCHEDULED',
-            description=f"Follow-up scheduled for {followup.scheduled_time.strftime('%Y-%m-%d %H:%M')}."
+            description=f"{followup.followup_type.title()} follow-up scheduled for {followup.scheduled_time.strftime('%Y-%m-%d %H:%M')}."
         )
         if followup.lead.owner:
             create_notification(

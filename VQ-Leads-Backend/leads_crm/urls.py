@@ -12,6 +12,7 @@ from .import_views import (
     ImportHistoryViewSet, ImportMappingTemplateViewSet
 )
 from .export_views import ExportPreviewView, ExportGenerateView, ExportHistoryViewSet, ExportStatsView
+from .activities_views import ActivitiesTimelineView, CallLogViewSet, LeadNoteViewSet, LeadEmailViewSet, ActivityWidgetStatsView
 
 router = DefaultRouter()
 router.register(r'leads', LeadViewSet, basename='lead')
@@ -24,6 +25,9 @@ router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'import-history', ImportHistoryViewSet, basename='import_history')
 router.register(r'import-mapping-templates', ImportMappingTemplateViewSet, basename='import_mapping_template')
 router.register(r'export-history', ExportHistoryViewSet, basename='export_history')
+router.register(r'call-logs', CallLogViewSet, basename='call_logs')
+router.register(r'notes', LeadNoteViewSet, basename='notes')
+router.register(r'emails', LeadEmailViewSet, basename='emails')
 
 urlpatterns = [
     # Auth endpoints
@@ -52,6 +56,8 @@ urlpatterns = [
     path('exports/preview/', ExportPreviewView.as_view(), name='exports_preview'),
     path('exports/generate/', ExportGenerateView.as_view(), name='exports_generate'),
     path('exports/stats/', ExportStatsView.as_view(), name='exports_stats'),
+    path('activities/timeline/', ActivitiesTimelineView.as_view(), name='activities_timeline'),
+    path('activities/widgets/', ActivityWidgetStatsView.as_view(), name='activities_widgets'),
 
     # ViewSet Router
     path('', include(router.urls)),
