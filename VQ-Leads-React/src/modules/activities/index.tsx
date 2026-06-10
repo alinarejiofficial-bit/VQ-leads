@@ -485,7 +485,7 @@ export const Activities: React.FC = () => {
               ))}
             </div>
           </Card>
-        </div>
+      </div>
       )}
     </div>
   );
