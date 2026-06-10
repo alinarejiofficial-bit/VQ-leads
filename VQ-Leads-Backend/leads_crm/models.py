@@ -150,12 +150,97 @@ class LeadActivity(models.Model):
         return f"{self.lead.name}: {self.activity_type} at {self.created_at}"
 
 
+class CallLog(models.Model):
+    CALL_TYPE_CHOICES = [('INCOMING', 'Incoming'), ('OUTGOING', 'Outgoing')]
+    CALL_STATUS_CHOICES = [
+        ('ANSWERED', 'Answered'),
+        ('MISSED', 'Missed'),
+        ('BUSY', 'Busy'),
+        ('NO_RESPONSE', 'No Response'),
+    ]
+    OUTCOME_CHOICES = [
+        ('INTERESTED', 'Interested'),
+        ('NOT_INTERESTED', 'Not Interested'),
+        ('CALLBACK_REQUESTED', 'Callback Requested'),
+        ('CONVERTED', 'Converted'),
+    ]
+
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='call_logs')
+    agent = models.ForeignKey(User, on_delete=models.CASCADE, related_name='call_logs')
+    call_date = models.DateTimeField()
+    duration = models.PositiveIntegerField(default=0, help_text='Duration in seconds')
+    call_type = models.CharField(max_length=20, choices=CALL_TYPE_CHOICES, default='OUTGOING')
+    call_status = models.CharField(max_length=20, choices=CALL_STATUS_CHOICES, default='ANSWERED')
+    outcome = models.CharField(max_length=30, choices=OUTCOME_CHOICES, blank=True, default='')
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.lead.name} - {self.agent.username} ({self.call_date})"
+
+
+class LeadNote(models.Model):
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='lead_notes')
+    title = models.CharField(max_length=150)
+    content = models.TextField()
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='lead_notes')
+    is_pinned = models.BooleanField(default=False)
+    mentions = models.ManyToManyField(User, blank=True, related_name='mentioned_in_notes')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.lead.name} - {self.title}"
+
+
+class LeadEmail(models.Model):
+    STATUS_CHOICES = [
+        ('DRAFT', 'Draft'),
+        ('SENT', 'Sent'),
+        ('DELIVERED', 'Delivered'),
+        ('OPENED', 'Opened'),
+        ('FAILED', 'Failed'),
+    ]
+    DIRECTION_CHOICES = [('SENT', 'Sent'), ('RECEIVED', 'Received')]
+
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='lead_emails')
+    subject = models.CharField(max_length=200)
+    sender = models.EmailField()
+    recipient = models.EmailField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SENT')
+    direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES, default='SENT')
+    content = models.TextField()
+    attachments = models.TextField(blank=True, help_text='Comma separated attachment names/urls')
+    sent_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.lead.name} - {self.subject}"
+
+
 class FollowUp(models.Model):
+    FOLLOWUP_TYPE_CHOICES = [
+        ('CALL', 'Call'),
+        ('MEETING', 'Meeting'),
+        ('EMAIL', 'Email'),
+        ('WHATSAPP', 'WhatsApp'),
+    ]
+
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='followups')
     scheduled_time = models.DateTimeField()
+    followup_type = models.CharField(max_length=20, choices=FOLLOWUP_TYPE_CHOICES, default='CALL')
     notes = models.TextField(blank=True)
     completed = models.BooleanField(default=False)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    assigned_agent = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_followups'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
