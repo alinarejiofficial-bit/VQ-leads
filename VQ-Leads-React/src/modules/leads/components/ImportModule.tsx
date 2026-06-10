@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   api,
@@ -25,6 +25,7 @@ const strategyLabel: Record<DuplicateStrategy, string> = {
 
 export const ImportModule: React.FC = () => {
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [step, setStep] = useState(0);
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -137,6 +138,10 @@ export const ImportModule: React.FC = () => {
     setUploadProgress(0);
   };
 
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleDownloadErrorReport = async (importId: number) => {
     try {
       const blob = await api.downloadImportErrorReport(importId);
@@ -173,17 +178,16 @@ export const ImportModule: React.FC = () => {
               <p className="text-sm font-semibold text-foreground">Drag & drop CSV/XLSX file</p>
               <p className="text-xs text-muted-foreground mt-1">or choose from your system</p>
               <input
+                ref={fileInputRef}
                 type="file"
                 accept=".csv,.xlsx"
                 className="hidden"
                 id="lead-import-file"
                 onChange={e => onPickFile(e.target.files?.[0] || null)}
               />
-              <label htmlFor="lead-import-file" className="inline-block mt-3">
-                <Button type="button" variant="outline">
-                  <FileUp size={14} className="mr-1.5" /> Select File
-                </Button>
-              </label>
+              <Button type="button" variant="outline" className="mt-3" onClick={openFilePicker}>
+                <FileUp size={14} className="mr-1.5" /> Select File
+              </Button>
             </div>
             {file && (
               <div className="text-xs text-muted-foreground">
