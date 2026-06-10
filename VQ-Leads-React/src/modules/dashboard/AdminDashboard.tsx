@@ -94,6 +94,50 @@ export const AdminDashboard: React.FC = () => {
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="flex items-center justify-between p-6">
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Exports</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{stats?.totalExports || 0}</span>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center">
+            <Users size={22} />
+          </div>
+        </Card>
+
+        <Card className="flex items-center justify-between p-6">
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Exports Today</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{stats?.exportsToday || 0}</span>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+            <Briefcase size={22} />
+          </div>
+        </Card>
+
+        <Card className="flex items-center justify-between p-6">
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Most Exported</span>
+            <span className="text-2xl font-bold mt-2 text-foreground">{stats?.mostExportedReport || 'N/A'}</span>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 flex items-center justify-center">
+            <TrendingUp size={22} />
+          </div>
+        </Card>
+
+        <Card className="flex items-center justify-between p-6">
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Last Export</span>
+            <span className="text-sm font-bold mt-2 text-foreground">
+              {stats?.lastExportActivity ? new Date(stats.lastExportActivity).toLocaleString() : 'No exports yet'}
+            </span>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+            <DollarSign size={22} />
+          </div>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 p-6">
           <div className="mb-6 text-left">

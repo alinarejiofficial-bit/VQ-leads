@@ -12,7 +12,7 @@ from django.utils import timezone
 from decimal import Decimal
 import datetime
 
-from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission, CommissionSettings, Notification, ImportHistory
+from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission, CommissionSettings, Notification, ImportHistory, ExportHistory
 from .serializers import (
     UserSerializer, UserProfileSerializer, SalesTeamSerializer,
     LeadFormSerializer, LeadSerializer, LeadActivitySerializer,
@@ -913,6 +913,9 @@ class DashboardStatsView(APIView):
         pipeline_value = leads_qs.exclude(status__in=['LOST', 'WON']).aggregate(total=Sum('value'))['total'] or Decimal('0.00')
 
         total_imports = records_imported_today = failed_imports = duplicate_detected = 0
+        total_exports = exports_today = 0
+        most_exported_report = 'N/A'
+        last_export_activity = None
         if isAdmin:
             imports_qs = ImportHistory.objects.all()
             total_imports = imports_qs.count()
@@ -921,6 +924,14 @@ class DashboardStatsView(APIView):
             )['total'] or 0
             failed_imports = imports_qs.filter(status__in=['FAILED', 'PARTIAL']).count()
             duplicate_detected = imports_qs.aggregate(total=Sum('duplicate_count'))['total'] or 0
+            exports_qs = ExportHistory.objects.all()
+            total_exports = exports_qs.count()
+            exports_today = exports_qs.filter(created_at__date=timezone.now().date()).count()
+            format_counts = exports_qs.values('file_type').annotate(count=Count('id')).order_by('-count')
+            if format_counts:
+                most_exported_report = format_counts[0]['file_type'].upper()
+            last = exports_qs.order_by('-created_at').first()
+            last_export_activity = last.created_at.isoformat() if last else None
 
         return Response({
             'totalLeads': total_leads,
@@ -934,6 +945,10 @@ class DashboardStatsView(APIView):
             'recordsImportedToday': records_imported_today,
             'failedImports': failed_imports,
             'duplicateLeadsDetected': duplicate_detected,
+            'totalExports': total_exports,
+            'exportsToday': exports_today,
+            'mostExportedReport': most_exported_report,
+            'lastExportActivity': last_export_activity,
         })
 
 

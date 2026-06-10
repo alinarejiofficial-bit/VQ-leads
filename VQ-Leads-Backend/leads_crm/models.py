@@ -287,6 +287,25 @@ class ImportMappingTemplate(models.Model):
         return f"{self.name} ({self.created_by.username})"
 
 
+class ExportHistory(models.Model):
+    STATUS_CHOICES = [
+        ('PROCESSING', 'Processing'),
+        ('COMPLETED', 'Completed'),
+        ('FAILED', 'Failed'),
+    ]
+
+    file_name = models.CharField(max_length=255)
+    file_type = models.CharField(max_length=10)
+    exported_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='lead_exports')
+    total_records = models.PositiveIntegerField(default=0)
+    filters_applied = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PROCESSING')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Export {self.id} - {self.file_name}"
+
+
 class Commission(models.Model):
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),

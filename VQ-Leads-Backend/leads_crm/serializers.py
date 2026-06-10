@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
     UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task,
-    Commission, Notification, ImportHistory, ImportLog, ImportMappingTemplate
+    Commission, Notification, ImportHistory, ImportLog, ImportMappingTemplate, ExportHistory
 )
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -200,3 +200,20 @@ class ImportMappingTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ImportMappingTemplate
         fields = ['id', 'name', 'mapping', 'created_at']
+
+
+class ExportHistorySerializer(serializers.ModelSerializer):
+    exported_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExportHistory
+        fields = [
+            'id', 'file_name', 'file_type', 'exported_by', 'exported_by_name',
+            'total_records', 'filters_applied', 'status', 'created_at'
+        ]
+
+    def get_exported_by_name(self, obj):
+        if obj.exported_by:
+            name = f"{obj.exported_by.first_name} {obj.exported_by.last_name}".strip()
+            return name if name else obj.exported_by.username
+        return ''

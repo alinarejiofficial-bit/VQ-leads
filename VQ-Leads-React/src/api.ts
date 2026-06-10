@@ -225,6 +225,39 @@ export interface DashboardStats {
   recordsImportedToday: number;
   failedImports: number;
   duplicateLeadsDetected: number;
+  totalExports: number;
+  exportsToday: number;
+  mostExportedReport: string;
+  lastExportActivity: string | null;
+}
+
+export interface ExportStats {
+  totalExports: number;
+  exportsToday: number;
+  mostExportedReport: string;
+  lastExportActivity: string | null;
+}
+
+export interface ExportPreviewResponse {
+  totalRecords: number;
+  sampleRows: string[][];
+  summary: {
+    won: number;
+    lost: number;
+    open: number;
+  };
+}
+
+export interface ExportHistoryItem {
+  id: number;
+  file_name: string;
+  file_type: 'csv' | 'xlsx' | 'pdf';
+  exported_by: number | null;
+  exported_by_name: string;
+  total_records: number;
+  filters_applied: Record<string, any>;
+  status: 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  created_at: string;
 }
 
 export interface ImportPreviewRow {
@@ -809,6 +842,56 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name, mapping }),
     });
+  },
+
+  // Lead Export
+  async previewLeadExport(payload: {
+    filters: Record<string, any>;
+    exportMode: 'ALL' | 'FILTERED' | 'SELECTED' | 'CURRENT_PAGE' | 'COMPLETE_DATASET';
+    selectedIds?: number[];
+    currentPageIds?: number[];
+  }): Promise<ExportPreviewResponse> {
+    return request<ExportPreviewResponse>('/exports/preview/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async generateLeadExport(payload: {
+    fileType: 'csv' | 'xlsx' | 'pdf';
+    filters: Record<string, any>;
+    exportMode: 'ALL' | 'FILTERED' | 'SELECTED' | 'CURRENT_PAGE' | 'COMPLETE_DATASET';
+    selectedIds?: number[];
+    currentPageIds?: number[];
+  }): Promise<{ history: ExportHistoryItem; downloadUrl: string }> {
+    return request<{ history: ExportHistoryItem; downloadUrl: string }>('/exports/generate/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getExportHistory(params?: { search?: string; fileType?: string; status?: string }): Promise<ExportHistoryItem[]> {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.fileType) query.set('fileType', params.fileType);
+    if (params?.status) query.set('status', params.status);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<ExportHistoryItem[]>(`/export-history/${suffix}`);
+  },
+
+  async downloadExportFile(id: number): Promise<Blob> {
+    const response = await fetch(`${API_BASE}/export-history/${id}/download/`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to download export');
+    }
+    return response.blob();
+  },
+
+  async getExportStats(): Promise<ExportStats> {
+    return request<ExportStats>('/exports/stats/');
   },
 
   // Dashboards

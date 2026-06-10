@@ -11,6 +11,7 @@ from .import_views import (
     ImportPreviewView, ImportDuplicateCheckView, ImportExecuteView,
     ImportHistoryViewSet, ImportMappingTemplateViewSet
 )
+from .export_views import ExportPreviewView, ExportGenerateView, ExportHistoryViewSet, ExportStatsView
 
 router = DefaultRouter()
 router.register(r'leads', LeadViewSet, basename='lead')
@@ -22,6 +23,7 @@ router.register(r'commissions', CommissionViewSet, basename='commission')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'import-history', ImportHistoryViewSet, basename='import_history')
 router.register(r'import-mapping-templates', ImportMappingTemplateViewSet, basename='import_mapping_template')
+router.register(r'export-history', ExportHistoryViewSet, basename='export_history')
 
 urlpatterns = [
     # Auth endpoints
@@ -47,6 +49,9 @@ urlpatterns = [
     path('imports/preview/', ImportPreviewView.as_view(), name='imports_preview'),
     path('imports/duplicate-check/', ImportDuplicateCheckView.as_view(), name='imports_duplicate_check'),
     path('imports/execute/', ImportExecuteView.as_view(), name='imports_execute'),
+    path('exports/preview/', ExportPreviewView.as_view(), name='exports_preview'),
+    path('exports/generate/', ExportGenerateView.as_view(), name='exports_generate'),
+    path('exports/stats/', ExportStatsView.as_view(), name='exports_stats'),
 
     # ViewSet Router
     path('', include(router.urls)),

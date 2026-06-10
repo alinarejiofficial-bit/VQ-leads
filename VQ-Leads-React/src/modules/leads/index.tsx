@@ -10,6 +10,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '.
 import { LeadDetailsDrawer } from './components/LeadDetailsDrawer';
 import { MyLeadsPipeline } from './components/MyLeadsPipeline';
 import { ImportModule } from './components/ImportModule';
+import { ExportModule } from './components/ExportModule';
 import { Plus, Search, UserCheck } from 'lucide-react';
 
 interface LeadsProps {
@@ -33,10 +34,6 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
 
   const isAdmin = user.profile.role === 'ADMIN';
   const canClaimLeads = !isAdmin;
-
-  if (isAdmin && action === 'import') {
-    return <ImportModule />;
-  }
 
   useEffect(() => {
     if (!urlFilter) {
@@ -172,6 +169,13 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const availableLeads = filteredLeads.filter(l => canClaimLead(l));
 
   const sources = Array.from(new Set(leads.map(l => l.source)));
+
+  if (isAdmin && action === 'import') {
+    return <ImportModule />;
+  }
+  if (isAdmin && action === 'export') {
+    return <ExportModule leads={leads} />;
+  }
 
   return (
     <div className="p-8 space-y-6">
