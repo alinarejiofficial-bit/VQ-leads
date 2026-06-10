@@ -186,26 +186,26 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="w-64 bg-card border-r border-border h-screen flex flex-col justify-between shrink-0 overflow-hidden">
+    <aside className="w-64 bg-card border-r border-border h-screen flex flex-col justify-between shrink-0 overflow-hidden select-none">
       <div className="flex flex-col flex-1 text-left overflow-y-auto p-4" style={{ scrollbarWidth: 'thin' }}>
         {/* Brand Header */}
-        <div className="flex items-center gap-3 px-2 py-4 mb-2">
-          <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20">
+        <div className="flex items-center gap-3 px-2 py-4 mb-2 group cursor-pointer">
+          <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20 transition-all duration-700 group-hover:rotate-[360deg] group-hover:scale-105">
             <span className="text-xl">❖</span>
           </div>
           <div className="flex flex-col text-left">
-            <span className="font-bold text-base text-foreground leading-tight">
+            <span className="font-bold text-base text-foreground leading-tight tracking-tight">
               VQ Leads
             </span>
-            <span className="text-[10px] font-semibold text-muted-foreground">
+            <span className="text-[10px] font-bold text-primary uppercase tracking-wider mt-0.5">
               CR Management
             </span>
           </div>
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex flex-col gap-0.5">
-          {filteredItems.map(item => {
+        <nav className="flex flex-col gap-1">
+          {filteredItems.map((item, idx) => {
             const IconComponent = item.icon;
             const isActive = isPathActive(item.path);
             const visibleChildren = item.children?.filter(
@@ -215,19 +215,24 @@ export const Sidebar: React.FC = () => {
             const isOpen = openMenus[item.label] ?? isActive;
 
             return (
-              <div key={item.label} className="animate-fade-in" style={{ animationDelay: '50ms' }}>
+              <div key={item.label} className="relative animate-fade-in-up opacity-0" style={{ animationDelay: `${idx * 40}ms` }}>
+                {/* Active Indicator Left Bar */}
+                {isActive && (
+                  <div className="absolute left-[-4px] top-1.5 bottom-1.5 w-1.5 rounded-r bg-primary transition-all duration-300" />
+                )}
+
                 {/* Parent Item */}
                 {hasChildren ? (
                   <button
                     onClick={() => setOpenMenus(prev => ({ ...prev, [item.label]: !isOpen }))}
-                    className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 hover:translate-x-0.5 cursor-pointer ${
+                    className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 hover:translate-x-1 cursor-pointer ${
                       isActive 
-                        ? 'bg-primary/10 text-primary font-semibold shadow-sm shadow-primary/5' 
-                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                        ? 'bg-primary/8 text-primary font-semibold' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <IconComponent size={17} strokeWidth={isActive ? 2.2 : 1.8} className={`transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <IconComponent size={17} strokeWidth={isActive ? 2.2 : 1.8} className={`transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
                       <span>{item.label}</span>
                     </div>
                     <ChevronRight 
@@ -238,13 +243,13 @@ export const Sidebar: React.FC = () => {
                 ) : (
                   <Link 
                     to={item.path}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 hover:translate-x-0.5 ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 hover:translate-x-1 ${
                       isActive 
-                        ? 'bg-primary/10 text-primary font-semibold shadow-sm shadow-primary/5' 
-                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                        ? 'bg-primary/8 text-primary font-semibold' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
                     }`}
                   >
-                    <IconComponent size={17} strokeWidth={isActive ? 2.2 : 1.8} className={`transition-transform duration-200 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <IconComponent size={17} strokeWidth={isActive ? 2.2 : 1.8} className={`transition-transform duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
                     <span>{item.label}</span>
                   </Link>
                 )}
@@ -265,9 +270,9 @@ export const Sidebar: React.FC = () => {
                           <Link
                             key={child.path + child.label}
                             to={child.path}
-                            className={`block px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-200 hover:translate-x-0.5 ${
+                            className={`block px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-200 hover:translate-x-1 ${
                               childActive
-                                ? 'text-primary bg-primary/8 font-semibold shadow-sm shadow-primary/5'
+                                ? 'text-primary bg-primary/8 font-semibold'
                                 : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
                             }`}
                           >
@@ -286,20 +291,20 @@ export const Sidebar: React.FC = () => {
 
       {/* User Card - always at bottom */}
       <div className="p-4 border-t border-border/40">
-        <div className="flex items-center justify-between p-2.5 rounded-xl bg-muted/20">
+        <div className="flex items-center justify-between p-2.5 rounded-xl bg-muted/20 border border-border/30 backdrop-blur-sm transition-all hover:bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center font-semibold text-white text-sm">
+            <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center font-bold text-white text-sm shadow-sm">
               {user.first_name ? user.first_name[0] : user.username[0].toUpperCase()}
             </div>
             <div className="flex flex-col text-left overflow-hidden">
               <span className="text-xs font-semibold text-foreground truncate">{user.full_name}</span>
-              <span className="text-[9px] font-bold uppercase text-primary">
+              <span className="text-[9px] font-bold uppercase text-primary tracking-wide">
                 {user.profile.role}
               </span>
             </div>
           </div>
           <button 
-            className="text-destructive hover:bg-destructive/10 p-1.5 rounded-lg transition-all cursor-pointer" 
+            className="text-destructive hover:bg-destructive/10 p-1.5 rounded-lg transition-all cursor-pointer hover:scale-105 active:scale-95" 
             onClick={handleLogout}
             title="Log Out"
           >

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, Bell, Plus, FileSpreadsheet, FileCode, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Bell, Plus, FileSpreadsheet, FileCode, ChevronDown, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '../../store';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -16,6 +16,26 @@ export const Header: React.FC = () => {
   });
   const unreadCount = notifications?.unreadCount || 0;
 
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('theme');
+      if (saved) return saved === 'dark';
+      return document.documentElement.classList.contains('dark');
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (isDark) {
+      root.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDark]);
+
   return (
     <header className="min-h-[70px] border-b border-border/80 flex flex-col md:flex-row md:items-center justify-between gap-4 px-8 py-3 bg-card/45 backdrop-blur-xl sticky top-0 z-40">
       {/* Search Bar */}
@@ -29,18 +49,18 @@ export const Header: React.FC = () => {
       </div>
 
       {/* Actions, Notifications & Profile */}
-      <div className="flex flex-wrap items-center gap-3.5 ml-auto">
+      <div className="flex flex-wrap items-center gap-3.5 ml-auto select-none">
         {user?.profile.role !== 'AGENT' && (
           <>
             <button 
               onClick={() => navigate('/leads')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/95 transition-all shadow-sm shadow-primary/10 cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/95 transition-all shadow-sm shadow-primary/10 cursor-pointer hover:scale-105 active:scale-95"
             >
               <Plus size={13} /> Add Lead
             </button>
             <button 
               onClick={() => navigate('/leads')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary border border-border text-foreground text-xs font-bold hover:bg-secondary/80 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary border border-border text-foreground text-xs font-bold hover:bg-secondary/80 transition-all cursor-pointer hover:scale-105 active:scale-95"
             >
               <FileSpreadsheet size={13} /> Import Excel
             </button>
@@ -49,7 +69,7 @@ export const Header: React.FC = () => {
         {user?.profile.role === 'ADMIN' && (
           <button 
             onClick={() => navigate('/forms')}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary border border-border text-foreground text-xs font-bold hover:bg-secondary/80 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary border border-border text-foreground text-xs font-bold hover:bg-secondary/80 transition-all cursor-pointer hover:scale-105 active:scale-95"
           >
             <FileCode size={13} /> Create Form
           </button>
@@ -57,10 +77,23 @@ export const Header: React.FC = () => {
 
         <div className="h-5 w-[1px] bg-border mx-1 hidden sm:block" />
 
+        {/* Theme Toggle */}
+        <button 
+          onClick={() => setIsDark(!isDark)}
+          className="h-9 w-9 rounded-xl hover:bg-secondary/50 flex items-center justify-center text-muted-foreground hover:text-foreground transition-all border border-border/60 cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        >
+          {isDark ? (
+            <Sun size={16} className="text-amber-400 animate-pulse" />
+          ) : (
+            <Moon size={16} className="text-indigo-500" />
+          )}
+        </button>
+
         {/* Notifications */}
         <button 
           onClick={() => navigate('/notifications')}
-          className="relative h-9 w-9 rounded-xl hover:bg-secondary/50 flex items-center justify-center text-muted-foreground hover:text-foreground transition-all border border-border/60"
+          className="relative h-9 w-9 rounded-xl hover:bg-secondary/50 flex items-center justify-center text-muted-foreground hover:text-foreground transition-all border border-border/60 hover-bell-shake"
         >
           <Bell size={16} />
           {unreadCount > 0 && (
