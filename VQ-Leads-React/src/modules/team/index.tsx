@@ -8,6 +8,8 @@ import { Input } from '../../components/forms/Input';
 import { Dialog } from '../../components/common/Dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/datatable/Table';
 import { Plus, Pencil, KeyRound, UserCheck, UserX } from 'lucide-react';
+import { RolesTab } from './RolesTab';
+import { ASSIGNABLE_MEMBER_ROLES, getRoleBadgeClass, getRoleLabel, type RoleId } from './rolesConfig';
 
 export const Teams: React.FC = () => {
   const queryClient = useQueryClient();
@@ -28,12 +30,14 @@ export const Teams: React.FC = () => {
   const [agentFirst, setAgentFirst] = useState('');
   const [agentLast, setAgentLast] = useState('');
   const [agentComm, setAgentComm] = useState('10.00');
+  const [agentRole, setAgentRole] = useState<RoleId>('AGENT');
 
   const [editingMember, setEditingMember] = useState<User | null>(null);
   const [editFirst, setEditFirst] = useState('');
   const [editLast, setEditLast] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editComm, setEditComm] = useState('10.00');
+  const [editRole, setEditRole] = useState<RoleId>('AGENT');
 
   const [resetMember, setResetMember] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -78,6 +82,7 @@ export const Teams: React.FC = () => {
       setAgentFirst('');
       setAgentLast('');
       setAgentComm('10.00');
+      setAgentRole('AGENT');
     },
     onError: (err: Error) => {
       alert(err.message || 'Failed to add member');

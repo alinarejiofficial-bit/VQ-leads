@@ -118,7 +118,7 @@ class AgentDetailView(APIView):
 
     def get_agent(self, pk):
         try:
-            return User.objects.get(pk=pk, profile__role='AGENT')
+            return User.objects.get(pk=pk, profile__role__in=['AGENT', 'LEADER'])
         except User.DoesNotExist:
             return None
 
@@ -133,6 +133,9 @@ class AgentDetailView(APIView):
             user.last_name = request.data['last_name']
         if 'email' in request.data:
             user.email = request.data['email']
+        if 'role' in request.data and request.data['role'] in ('AGENT', 'LEADER'):
+            user.profile.role = request.data['role']
+            user.profile.save()
         if 'commission_rate' in request.data:
             user.profile.commission_rate = Decimal(str(request.data['commission_rate']))
             user.profile.save()
