@@ -48,28 +48,40 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
     return { x, y1, y2, ...d };
   });
 
-  // Build path for Line 1 (Total Leads) - Green
+  // Build path for Line 1 (Total Leads) - Green (Smooth Bezier Curve)
   let pathD1 = '';
   let areaD1 = '';
   if (points.length > 0) {
     pathD1 = `M ${points[0].x} ${points[0].y1}`;
-    areaD1 = `M ${points[0].x} ${height - padding.bottom}`;
     for (let i = 1; i < points.length; i++) {
-      pathD1 += ` L ${points[i].x} ${points[i].y1}`;
+      const p0 = points[i - 1];
+      const p1 = points[i];
+      const cpX1 = p0.x + (p1.x - p0.x) / 3;
+      const cpY1 = p0.y1;
+      const cpX2 = p1.x - (p1.x - p0.x) / 3;
+      const cpY2 = p1.y1;
+      pathD1 += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y1}`;
     }
+    areaD1 = `M ${points[0].x} ${height - padding.bottom}`;
     areaD1 += pathD1.substring(1);
     areaD1 += ` L ${points[points.length - 1].x} ${height - padding.bottom} Z`;
   }
 
-  // Build path for Line 2 (Converted Leads) - Blue
+  // Build path for Line 2 (Converted Leads) - Blue (Smooth Bezier Curve)
   let pathD2 = '';
   let areaD2 = '';
   if (points.length > 0) {
     pathD2 = `M ${points[0].x} ${points[0].y2}`;
-    areaD2 = `M ${points[0].x} ${height - padding.bottom}`;
     for (let i = 1; i < points.length; i++) {
-      pathD2 += ` L ${points[i].x} ${points[i].y2}`;
+      const p0 = points[i - 1];
+      const p1 = points[i];
+      const cpX1 = p0.x + (p1.x - p0.x) / 3;
+      const cpY1 = p0.y2;
+      const cpX2 = p1.x - (p1.x - p0.x) / 3;
+      const cpY2 = p1.y2;
+      pathD2 += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y2}`;
     }
+    areaD2 = `M ${points[0].x} ${height - padding.bottom}`;
     areaD2 += pathD2.substring(1);
     areaD2 += ` L ${points[points.length - 1].x} ${height - padding.bottom} Z`;
   }
