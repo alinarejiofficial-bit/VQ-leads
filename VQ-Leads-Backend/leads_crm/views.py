@@ -721,14 +721,6 @@ class PublicFormSubmitView(APIView):
 class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
 
-    def get_queryset(self):
-        user = self.request.user
-        if not user.is_authenticated:
-            return Task.objects.none()
-        if user.profile.role == 'ADMIN':
-            return Task.objects.all().order_by('due_date')
-        return Task.objects.filter(Q(assigned_to=user) | Q(created_by=user)).order_by('due_date')
-
     def perform_create(self, serializer):
         task = serializer.save(created_by=self.request.user)
         if task.lead:
@@ -827,10 +819,10 @@ class TaskViewSet(viewsets.ModelViewSet):
         if due_filter == 'today':
             qs = qs.filter(due_date__date=timezone.now().date())
         elif due_filter == 'tomorrow':
-            tomorrow = (timezone.now() + timezone.timedelta(days=1)).date()
+            tomorrow = (timezone.now() + datetime.timedelta(days=1)).date()
             qs = qs.filter(due_date__date=tomorrow)
         elif due_filter == 'this_week':
-            week_end = timezone.now() + timezone.timedelta(days=7)
+            week_end = timezone.now() + datetime.timedelta(days=7)
             qs = qs.filter(due_date__lte=week_end)
         elif due_filter == 'overdue':
             qs = qs.filter(status='OVERDUE')

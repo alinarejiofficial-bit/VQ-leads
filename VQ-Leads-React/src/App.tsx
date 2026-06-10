@@ -33,7 +33,8 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
-  if (!isAuthenticated) {
+  const user = useAuthStore(state => state.user);
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
@@ -108,11 +109,9 @@ function App() {
           path="/dashboard" 
           element={
             <ProtectedRoute>
-              {user && (
-                <AdminLayout>
-                  <Dashboard user={user} />
-                </AdminLayout>
-              )}
+              <AdminLayout>
+                <Dashboard user={user!} />
+              </AdminLayout>
             </ProtectedRoute>
           } 
         />
@@ -121,11 +120,9 @@ function App() {
           path="/leads" 
           element={
             <ProtectedRoute>
-              {user && (
-                <AdminLayout>
-                  <Leads user={user} />
-                </AdminLayout>
-              )}
+              <AdminLayout>
+                <Leads user={user!} />
+              </AdminLayout>
             </ProtectedRoute>
           } 
         />
@@ -135,11 +132,9 @@ function App() {
           element={
             <ProtectedRoute>
               <AdminRoute>
-                {user && (
-                  <AdminLayout>
-                    <Teams />
-                  </AdminLayout>
-                )}
+                <AdminLayout>
+                  <Teams />
+                </AdminLayout>
               </AdminRoute>
             </ProtectedRoute>
           } 
@@ -150,11 +145,9 @@ function App() {
           element={
             <ProtectedRoute>
               <AdminRoute>
-                {user && (
-                  <AdminLayout>
-                    <Forms />
-                  </AdminLayout>
-                )}
+                <AdminLayout>
+                  <Forms />
+                </AdminLayout>
               </AdminRoute>
             </ProtectedRoute>
           } 
@@ -164,11 +157,9 @@ function App() {
           path="/commissions" 
           element={
             <ProtectedRoute>
-              {user && (
-                <AdminLayout>
-                  <Commissions user={user} />
-                </AdminLayout>
-              )}
+              <AdminLayout>
+                <Commissions user={user!} />
+              </AdminLayout>
             </ProtectedRoute>
           } 
         />
@@ -177,11 +168,9 @@ function App() {
           path="/tasks" 
           element={
             <ProtectedRoute>
-              {user && (
-                <AdminLayout>
-                  <TasksPage />
-                </AdminLayout>
-              )}
+              <AdminLayout>
+                <TasksPage />
+              </AdminLayout>
             </ProtectedRoute>
           } 
         />
@@ -190,11 +179,9 @@ function App() {
           path="/activities" 
           element={
             <ProtectedRoute>
-              {user && (
-                <AdminLayout>
-                  <Activities />
-                </AdminLayout>
-              )}
+              <AdminLayout>
+                <Activities />
+              </AdminLayout>
             </ProtectedRoute>
           } 
         />
@@ -202,11 +189,9 @@ function App() {
           path="/followups" 
           element={
             <ProtectedRoute>
-              {user && (
-                <AdminLayout>
-                  <FollowUps />
-                </AdminLayout>
-              )}
+              <AdminLayout>
+                <FollowUps />
+              </AdminLayout>
             </ProtectedRoute>
           } 
         />
@@ -214,11 +199,9 @@ function App() {
           path="/notifications" 
           element={
             <ProtectedRoute>
-              {user && (
-                <AdminLayout>
-                  <Notifications />
-                </AdminLayout>
-              )}
+              <AdminLayout>
+                <Notifications />
+              </AdminLayout>
             </ProtectedRoute>
           } 
         />
@@ -227,11 +210,9 @@ function App() {
           element={
             <ProtectedRoute>
               <AdminRoute>
-                {user && (
-                  <AdminLayout>
-                    <AuditLogs />
-                  </AdminLayout>
-                )}
+                <AdminLayout>
+                  <AuditLogs />
+                </AdminLayout>
               </AdminRoute>
             </ProtectedRoute>
           } 
@@ -242,11 +223,9 @@ function App() {
           element={
             <ProtectedRoute>
               <LeaderOrAdminRoute>
-                {user && (
-                  <AdminLayout>
-                    <Reports />
-                  </AdminLayout>
-                )}
+                <AdminLayout>
+                  <Reports />
+                </AdminLayout>
               </LeaderOrAdminRoute>
             </ProtectedRoute>
           } 
@@ -257,11 +236,9 @@ function App() {
           element={
             <ProtectedRoute>
               <AdminRoute>
-                {user && (
-                  <AdminLayout>
-                    <Settings />
-                  </AdminLayout>
-                )}
+                <AdminLayout>
+                  <Settings />
+                </AdminLayout>
               </AdminRoute>
             </ProtectedRoute>
           } 
