@@ -7,6 +7,10 @@ from .views import (
     CommissionViewSet, DashboardStatsView, DashboardChartsView, AgentDashboardView,
     TeamPerformanceView, CommissionSettingsView, NotificationViewSet,
 )
+from .import_views import (
+    ImportPreviewView, ImportDuplicateCheckView, ImportExecuteView,
+    ImportHistoryViewSet, ImportMappingTemplateViewSet
+)
 
 router = DefaultRouter()
 router.register(r'leads', LeadViewSet, basename='lead')
@@ -16,6 +20,8 @@ router.register(r'tasks', TaskViewSet, basename='task')
 router.register(r'followups', FollowUpViewSet, basename='followup')
 router.register(r'commissions', CommissionViewSet, basename='commission')
 router.register(r'notifications', NotificationViewSet, basename='notification')
+router.register(r'import-history', ImportHistoryViewSet, basename='import_history')
+router.register(r'import-mapping-templates', ImportMappingTemplateViewSet, basename='import_mapping_template')
 
 urlpatterns = [
     # Auth endpoints
@@ -38,6 +44,9 @@ urlpatterns = [
     path('dashboard/agent/', AgentDashboardView.as_view(), name='dashboard_agent'),
     path('team/performance/', TeamPerformanceView.as_view(), name='team_performance'),
     path('commissions/settings/', CommissionSettingsView.as_view(), name='commission_settings'),
+    path('imports/preview/', ImportPreviewView.as_view(), name='imports_preview'),
+    path('imports/duplicate-check/', ImportDuplicateCheckView.as_view(), name='imports_duplicate_check'),
+    path('imports/execute/', ImportExecuteView.as_view(), name='imports_execute'),
 
     # ViewSet Router
     path('', include(router.urls)),

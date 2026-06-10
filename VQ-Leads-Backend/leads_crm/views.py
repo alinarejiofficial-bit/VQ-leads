@@ -12,7 +12,7 @@ from django.utils import timezone
 from decimal import Decimal
 import datetime
 
-from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission, CommissionSettings, Notification
+from .models import UserProfile, SalesTeam, LeadForm, Lead, LeadActivity, FollowUp, Task, Commission, CommissionSettings, Notification, ImportHistory
 from .serializers import (
     UserSerializer, UserProfileSerializer, SalesTeamSerializer,
     LeadFormSerializer, LeadSerializer, LeadActivitySerializer,
@@ -912,6 +912,16 @@ class DashboardStatsView(APIView):
         # Pipeline value
         pipeline_value = leads_qs.exclude(status__in=['LOST', 'WON']).aggregate(total=Sum('value'))['total'] or Decimal('0.00')
 
+        total_imports = records_imported_today = failed_imports = duplicate_detected = 0
+        if isAdmin:
+            imports_qs = ImportHistory.objects.all()
+            total_imports = imports_qs.count()
+            records_imported_today = imports_qs.filter(created_at__date=timezone.now().date()).aggregate(
+                total=Sum('success_count')
+            )['total'] or 0
+            failed_imports = imports_qs.filter(status__in=['FAILED', 'PARTIAL']).count()
+            duplicate_detected = imports_qs.aggregate(total=Sum('duplicate_count'))['total'] or 0
+
         return Response({
             'totalLeads': total_leads,
             'pendingFollowups': pending_followups,
@@ -919,7 +929,11 @@ class DashboardStatsView(APIView):
             'conversionRate': round(conversion_rate, 2),
             'pipelineValue': float(pipeline_value),
             'statusBreakdown': status_map,
-            'sourceBreakdown': {item['source']: item['count'] for item in source_breakdown}
+            'sourceBreakdown': {item['source']: item['count'] for item in source_breakdown},
+            'totalImports': total_imports,
+            'recordsImportedToday': records_imported_today,
+            'failedImports': failed_imports,
+            'duplicateLeadsDetected': duplicate_detected,
         })
 
 

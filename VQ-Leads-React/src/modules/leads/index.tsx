@@ -9,6 +9,7 @@ import { Dialog } from '../../components/common/Dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/datatable/Table';
 import { LeadDetailsDrawer } from './components/LeadDetailsDrawer';
 import { MyLeadsPipeline } from './components/MyLeadsPipeline';
+import { ImportModule } from './components/ImportModule';
 import { Plus, Search, UserCheck } from 'lucide-react';
 
 interface LeadsProps {
@@ -20,6 +21,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const urlFilter = searchParams.get('filter');
+  const action = searchParams.get('action');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -31,6 +33,10 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
 
   const isAdmin = user.profile.role === 'ADMIN';
   const canClaimLeads = !isAdmin;
+
+  if (isAdmin && action === 'import') {
+    return <ImportModule />;
+  }
 
   useEffect(() => {
     if (!urlFilter) {

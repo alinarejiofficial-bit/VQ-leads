@@ -221,6 +221,77 @@ export interface DashboardStats {
   pipelineValue: number;
   statusBreakdown: Record<string, number>;
   sourceBreakdown: Record<string, number>;
+  totalImports: number;
+  recordsImportedToday: number;
+  failedImports: number;
+  duplicateLeadsDetected: number;
+}
+
+export interface ImportPreviewRow {
+  rowNumber: number;
+  raw: Record<string, string>;
+  mapped: Record<string, string>;
+  isEmpty: boolean;
+  errors: string[];
+}
+
+export interface ImportPreviewResponse {
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  headers: string[];
+  detectedMapping: Record<string, string>;
+  totalRecords: number;
+  previewRows: ImportPreviewRow[];
+  invalidRows: number;
+  emptyRows: number;
+}
+
+export interface DuplicateRecord {
+  rowNumber: number;
+  name: string;
+  phone: string;
+  email: string;
+  matchedLeadId: number;
+  matchReason: 'phone' | 'email';
+}
+
+export interface DuplicateCheckResponse {
+  duplicateCount: number;
+  duplicates: DuplicateRecord[];
+}
+
+export interface ImportLog {
+  id: number;
+  row_number: number;
+  status: 'SUCCESS' | 'FAILED' | 'DUPLICATE' | 'UPDATED';
+  error_message: string;
+  row_data: Record<string, string>;
+  created_at: string;
+}
+
+export interface ImportHistory {
+  id: number;
+  file_name: string;
+  file_type: string;
+  total_records: number;
+  success_count: number;
+  failed_count: number;
+  duplicate_count: number;
+  imported_by: number | null;
+  imported_by_name: string;
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'PARTIAL' | 'FAILED';
+  duplicate_strategy: 'SKIP' | 'UPDATE' | 'IMPORT_ALL';
+  column_mapping: Record<string, string>;
+  created_at: string;
+  logs?: ImportLog[];
+}
+
+export interface ImportMappingTemplate {
+  id: number;
+  name: string;
+  mapping: Record<string, string>;
+  created_at: string;
 }
 
 export interface ChartTimelineItem {
@@ -336,6 +407,46 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   return response.json();
+}
+
+function uploadFormData<T>(
+  path: string,
+  body: FormData,
+  onProgress?: (percent: number) => void
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}${path}`);
+
+    const token = localStorage.getItem('vq_token');
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    xhr.upload.onprogress = evt => {
+      if (!onProgress || !evt.lengthComputable) return;
+      const percent = Math.round((evt.loaded / evt.total) * 100);
+      onProgress(percent);
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as T);
+        } catch {
+          resolve({} as T);
+        }
+      } else {
+        try {
+          const parsed = JSON.parse(xhr.responseText || '{}');
+          reject(new Error(parsed.error || parsed.detail || `Request failed with status ${xhr.status}`));
+        } catch {
+          reject(new Error(`Request failed with status ${xhr.status}`));
+        }
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Upload failed'));
+    xhr.send(body);
+  });
 }
 
 // API methods
@@ -629,6 +740,75 @@ export const api = {
 
   async markAllNotificationsRead(): Promise<{ success: boolean }> {
     return request<{ success: boolean }>('/notifications/mark_all_read/', { method: 'POST' });
+  },
+
+  // Lead Import
+  async previewLeadImport(file: File, onProgress?: (percent: number) => void): Promise<ImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return uploadFormData<ImportPreviewResponse>('/imports/preview/', formData, onProgress);
+  },
+
+  async checkLeadImportDuplicates(
+    file: File,
+    mapping: Record<string, string>,
+    onProgress?: (percent: number) => void
+  ): Promise<DuplicateCheckResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('mapping', JSON.stringify(mapping));
+    return uploadFormData<DuplicateCheckResponse>('/imports/duplicate-check/', formData, onProgress);
+  },
+
+  async executeLeadImport(
+    file: File,
+    mapping: Record<string, string>,
+    duplicateStrategy: 'SKIP' | 'UPDATE' | 'IMPORT_ALL',
+    onProgress?: (percent: number) => void
+  ): Promise<ImportHistory> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('mapping', JSON.stringify(mapping));
+    formData.append('duplicateStrategy', duplicateStrategy);
+    return uploadFormData<ImportHistory>('/imports/execute/', formData, onProgress);
+  },
+
+  async getImportHistory(params?: { search?: string; status?: string }): Promise<ImportHistory[]> {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.status) query.set('status', params.status);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<ImportHistory[]>(`/import-history/${suffix}`);
+  },
+
+  async getImportHistoryDetail(id: number): Promise<ImportHistory> {
+    return request<ImportHistory>(`/import-history/${id}/`);
+  },
+
+  async retryImportFailed(id: number): Promise<ImportHistory> {
+    return request<ImportHistory>(`/import-history/${id}/retry-failed/`, { method: 'POST' });
+  },
+
+  async downloadImportErrorReport(id: number): Promise<Blob> {
+    const response = await fetch(`${API_BASE}/import-history/${id}/error-report/`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to download report');
+    }
+    return response.blob();
+  },
+
+  async getImportMappingTemplates(): Promise<ImportMappingTemplate[]> {
+    return request<ImportMappingTemplate[]>('/import-mapping-templates/');
+  },
+
+  async createImportMappingTemplate(name: string, mapping: Record<string, string>): Promise<ImportMappingTemplate> {
+    return request<ImportMappingTemplate>('/import-mapping-templates/', {
+      method: 'POST',
+      body: JSON.stringify({ name, mapping }),
+    });
   },
 
   // Dashboards
