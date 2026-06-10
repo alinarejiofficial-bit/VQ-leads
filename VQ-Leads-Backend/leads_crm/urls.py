@@ -14,6 +14,7 @@ from .import_views import (
 from .export_views import ExportPreviewView, ExportGenerateView, ExportHistoryViewSet, ExportStatsView
 from .activities_views import ActivitiesTimelineView, CallLogViewSet, LeadNoteViewSet, LeadEmailViewSet, ActivityWidgetStatsView
 from .task_views import TaskCommentViewSet, TaskHistoryViewSet, TaskWidgetStatsView
+from .followup_views import FollowUpHistoryViewSet, FollowUpWidgetStatsView, FollowUpAnalyticsView
 
 router = DefaultRouter()
 router.register(r'leads', LeadViewSet, basename='lead')
@@ -28,6 +29,7 @@ router.register(r'import-mapping-templates', ImportMappingTemplateViewSet, basen
 router.register(r'export-history', ExportHistoryViewSet, basename='export_history')
 router.register(r'task-comments', TaskCommentViewSet, basename='task_comments')
 router.register(r'task-history', TaskHistoryViewSet, basename='task_history')
+router.register(r'followup-history', FollowUpHistoryViewSet, basename='followup_history')
 router.register(r'call-logs', CallLogViewSet, basename='call_logs')
 router.register(r'notes', LeadNoteViewSet, basename='notes')
 router.register(r'emails', LeadEmailViewSet, basename='emails')
@@ -62,6 +64,8 @@ urlpatterns = [
     path('activities/timeline/', ActivitiesTimelineView.as_view(), name='activities_timeline'),
     path('activities/widgets/', ActivityWidgetStatsView.as_view(), name='activities_widgets'),
     path('tasks/widgets/', TaskWidgetStatsView.as_view(), name='tasks_widgets'),
+    path('followups/widgets/', FollowUpWidgetStatsView.as_view(), name='followups_widgets'),
+    path('followups/analytics/', FollowUpAnalyticsView.as_view(), name='followups_analytics'),
 
     # ViewSet Router
     path('', include(router.urls)),

@@ -837,25 +837,72 @@ class FollowUpViewSet(viewsets.ModelViewSet):
     serializer_class = FollowUpSerializer
 
     def get_queryset(self):
+        from .followup_views import followups_visible_to
         user = self.request.user
         if not user.is_authenticated:
             return FollowUp.objects.none()
-        if user.profile.role == 'ADMIN':
-            return FollowUp.objects.all().order_by('scheduled_time')
-        return FollowUp.objects.filter(lead__owner=user).order_by('scheduled_time')
+
+        qs = followups_visible_to(user)
+        now = timezone.now()
+        today = timezone.localtime(now).date()
+        params = self.request.query_params
+
+        bucket = params.get('bucket')  # upcoming | today | overdue | completed | cancelled
+        if bucket == 'upcoming':
+            qs = qs.filter(status='SCHEDULED', scheduled_time__gte=now).exclude(scheduled_time__date=today)
+        elif bucket == 'today':
+            qs = qs.filter(status='SCHEDULED', scheduled_time__date=today)
+        elif bucket == 'overdue':
+            qs = qs.filter(status='SCHEDULED', scheduled_time__lt=now)
+        elif bucket == 'completed':
+            qs = qs.filter(status='COMPLETED')
+        elif bucket == 'cancelled':
+            qs = qs.filter(status='CANCELLED')
+
+        if params.get('agent'):
+            qs = qs.filter(assigned_agent_id=params['agent'])
+        if params.get('lead'):
+            qs = qs.filter(lead_id=params['lead'])
+        if params.get('followup_type'):
+            qs = qs.filter(followup_type=params['followup_type'])
+        if params.get('priority'):
+            qs = qs.filter(priority=params['priority'])
+        if params.get('q'):
+            search = params['q']
+            qs = qs.filter(Q(lead__name__icontains=search) | Q(notes__icontains=search))
+        if params.get('date_from'):
+            qs = qs.filter(scheduled_time__date__gte=params['date_from'])
+        if params.get('date_to'):
+            qs = qs.filter(scheduled_time__date__lte=params['date_to'])
+
+        return qs.order_by('scheduled_time')
 
     def perform_create(self, serializer):
+        from .followup_views import record_followup_history
         followup = serializer.save(
             created_by=self.request.user,
             assigned_agent=serializer.validated_data.get('assigned_agent') or self.request.user
         )
+        # Sync legacy boolean with status
+        if followup.completed and followup.status != 'COMPLETED':
+            followup.status = 'COMPLETED'
+            followup.save(update_fields=['status'])
+        record_followup_history(followup, 'CREATED', '', followup.scheduled_time.isoformat(), self.request.user)
         LeadActivity.objects.create(
             lead=followup.lead,
             user=self.request.user,
             activity_type='FOLLOW_UP_SCHEDULED',
-            description=f"{followup.followup_type.title()} follow-up scheduled for {followup.scheduled_time.strftime('%Y-%m-%d %H:%M')}."
+            description=f"{followup.get_followup_type_display()} follow-up scheduled for {followup.scheduled_time.strftime('%Y-%m-%d %H:%M')}."
         )
-        if followup.lead.owner:
+        if followup.assigned_agent and followup.assigned_agent != self.request.user:
+            create_notification(
+                recipient=followup.assigned_agent,
+                notif_type='FOLLOWUP_REMINDER',
+                title='Follow-up Assigned',
+                message=f"A {followup.get_followup_type_display()} follow-up for lead {followup.lead.name} was assigned to you ({followup.scheduled_time.strftime('%Y-%m-%d %H:%M')}).",
+                lead=followup.lead
+            )
+        elif followup.lead.owner and followup.lead.owner != self.request.user:
             create_notification(
                 recipient=followup.lead.owner,
                 notif_type='FOLLOWUP_REMINDER',
@@ -865,16 +912,149 @@ class FollowUpViewSet(viewsets.ModelViewSet):
             )
 
     def perform_update(self, serializer):
+        from .followup_views import record_followup_history
         followup = self.get_object()
+        old_status = followup.status
         old_completed = followup.completed
-        updated = serializer.save()
-        if old_completed != updated.completed:
+        old_time = followup.scheduled_time
+        old_agent = followup.assigned_agent_id
+
+        new_status = serializer.validated_data.get('status', old_status)
+        new_completed = serializer.validated_data.get('completed', old_completed)
+
+        extra = {}
+        # Keep status and legacy boolean in sync, stamp completion metadata
+        becoming_completed = (new_status == 'COMPLETED' or new_completed) and old_status != 'COMPLETED'
+        leaving_completed = old_status == 'COMPLETED' and new_status not in ('COMPLETED',) and not new_completed
+        if becoming_completed:
+            extra['status'] = 'COMPLETED'
+            extra['completed'] = True
+            extra['completed_at'] = timezone.now()
+            extra['completed_by'] = self.request.user
+        elif leaving_completed:
+            extra['completed'] = False
+            extra['completed_at'] = None
+            extra['completed_by'] = None
+
+        updated = serializer.save(**extra)
+
+        if old_status != updated.status:
+            record_followup_history(updated, 'STATUS_CHANGED', old_status, updated.status, self.request.user)
             LeadActivity.objects.create(
                 lead=updated.lead,
                 user=self.request.user,
-                activity_type='FOLLOW_UP_COMPLETED' if updated.completed else 'FOLLOW_UP_REOPENED',
-                description=f"Follow-up scheduled for {updated.scheduled_time} marked as {'completed' if updated.completed else 'pending'}."
+                activity_type='FOLLOW_UP_COMPLETED' if updated.status == 'COMPLETED' else 'FOLLOW_UP_UPDATED',
+                description=f"Follow-up for {updated.lead.name} marked as {updated.status}."
             )
+            if updated.status == 'COMPLETED' and updated.created_by != self.request.user:
+                create_notification(
+                    recipient=updated.created_by,
+                    notif_type='FOLLOWUP_REMINDER',
+                    title='Follow-up Completed',
+                    message=f"Follow-up for lead {updated.lead.name} was completed by {self.request.user.username}.",
+                    lead=updated.lead
+                )
+
+        if old_time != updated.scheduled_time:
+            record_followup_history(
+                updated, 'RESCHEDULED',
+                old_time.isoformat(), updated.scheduled_time.isoformat(),
+                self.request.user
+            )
+
+        if old_agent != updated.assigned_agent_id:
+            record_followup_history(updated, 'REASSIGNED', str(old_agent), str(updated.assigned_agent_id), self.request.user)
+            if updated.assigned_agent and updated.assigned_agent != self.request.user:
+                create_notification(
+                    recipient=updated.assigned_agent,
+                    notif_type='FOLLOWUP_REMINDER',
+                    title='Follow-up Assigned',
+                    message=f"A follow-up for lead {updated.lead.name} was reassigned to you.",
+                    lead=updated.lead
+                )
+
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        from .followup_views import record_followup_history
+        followup = self.get_object()
+        if followup.status == 'COMPLETED':
+            return Response(FollowUpSerializer(followup).data)
+        old_status = followup.status
+        followup.status = 'COMPLETED'
+        followup.completed = True
+        followup.completed_at = timezone.now()
+        followup.completed_by = request.user
+        completion_notes = request.data.get('notes', '')
+        if completion_notes:
+            followup.notes = (followup.notes + '\n' if followup.notes else '') + completion_notes
+        followup.save()
+        record_followup_history(followup, 'STATUS_CHANGED', old_status, 'COMPLETED', request.user)
+        LeadActivity.objects.create(
+            lead=followup.lead,
+            user=request.user,
+            activity_type='FOLLOW_UP_COMPLETED',
+            description=f"Follow-up for {followup.lead.name} completed."
+        )
+        if followup.created_by != request.user:
+            create_notification(
+                recipient=followup.created_by,
+                notif_type='FOLLOWUP_REMINDER',
+                title='Follow-up Completed',
+                message=f"Follow-up for lead {followup.lead.name} was completed by {request.user.username}.",
+                lead=followup.lead
+            )
+        return Response(FollowUpSerializer(followup).data)
+
+    @action(detail=False, methods=['post'])
+    def bulk_reassign(self, request):
+        from .followup_views import record_followup_history
+        ids = request.data.get('ids', [])
+        agent_id = request.data.get('agent')
+        if not ids or not agent_id:
+            return Response({'detail': 'ids and agent are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            agent = User.objects.get(pk=agent_id, is_active=True)
+        except User.DoesNotExist:
+            return Response({'detail': 'Agent not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        followups = self.get_queryset().filter(id__in=ids, status='SCHEDULED')
+        updated = 0
+        for f in followups:
+            old_agent = f.assigned_agent_id
+            f.assigned_agent = agent
+            f.save(update_fields=['assigned_agent', 'updated_at'])
+            record_followup_history(f, 'REASSIGNED', str(old_agent), str(agent.id), request.user)
+            updated += 1
+        if updated:
+            create_notification(
+                recipient=agent,
+                notif_type='FOLLOWUP_REMINDER',
+                title='Follow-ups Assigned',
+                message=f"{updated} follow-up(s) were reassigned to you by {request.user.username}.",
+            )
+        return Response({'updated': updated})
+
+    @action(detail=False, methods=['post'])
+    def bulk_reschedule(self, request):
+        from .followup_views import record_followup_history
+        ids = request.data.get('ids', [])
+        new_time = request.data.get('scheduled_time')
+        shift_days = request.data.get('shift_days')
+        if not ids or (not new_time and not shift_days):
+            return Response({'detail': 'ids and scheduled_time or shift_days are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        followups = self.get_queryset().filter(id__in=ids, status='SCHEDULED')
+        updated = 0
+        for f in followups:
+            old_time = f.scheduled_time
+            if new_time:
+                f.scheduled_time = new_time
+            else:
+                f.scheduled_time = f.scheduled_time + datetime.timedelta(days=int(shift_days))
+            f.save(update_fields=['scheduled_time', 'updated_at'])
+            record_followup_history(f, 'RESCHEDULED', old_time.isoformat(), str(f.scheduled_time), request.user)
+            updated += 1
+        return Response({'updated': updated})
 
 
 # Commission ViewSet

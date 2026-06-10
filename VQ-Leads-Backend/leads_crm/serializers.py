@@ -40,10 +40,15 @@ class SalesTeamSerializer(serializers.ModelSerializer):
 
 class LeadFormSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
+    submission_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = LeadForm
-        fields = ['id', 'name', 'description', 'assignment_mode', 'is_active', 'source_name', 'created_at', 'created_by', 'created_by_name']
+        fields = [
+            'id', 'name', 'description', 'assignment_mode', 'is_active',
+            'source_name', 'submission_count',
+            'created_at', 'created_by', 'created_by_name'
+        ]
 
     def get_created_by_name(self, obj):
         if obj.created_by:
@@ -125,7 +130,7 @@ class FollowUpSerializer(serializers.ModelSerializer):
             'created_by', 'created_by_name', 'assigned_agent', 'assigned_agent_details',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['completed_at', 'completed_by']
+        read_only_fields = ['completed_at', 'completed_by', 'created_by']
 
     def get_created_by_name(self, obj):
         name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()

@@ -197,20 +197,70 @@ export interface TeamPerformanceData {
   };
 }
 
+export type FollowUpType =
+  | 'CALL' | 'EMAIL' | 'WHATSAPP' | 'MEETING'
+  | 'SITE_VISIT' | 'DEMO' | 'QUOTATION' | 'PAYMENT_REMINDER';
+
+export type FollowUpPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type FollowUpStatus = 'UPCOMING' | 'TODAY' | 'OVERDUE' | 'COMPLETED' | 'CANCELLED';
+
 export interface FollowUp {
   id: number;
   lead: number;
   lead_name: string;
+  lead_phone?: string;
+  lead_email?: string;
+  lead_source?: string;
   scheduled_time: string;
+  followup_type: FollowUpType;
+  priority: FollowUpPriority;
+  reminder_time?: string | null;
   notes: string;
+  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+  effective_status: FollowUpStatus;
+  days_overdue: number;
   completed: boolean;
-  status?: 'PENDING' | 'COMPLETED' | 'OVERDUE';
-  followup_type?: 'CALL' | 'MEETING' | 'EMAIL' | 'WHATSAPP';
+  completed_at?: string | null;
+  completed_by?: number | null;
+  completed_by_name?: string;
   created_by: number;
   created_by_name: string;
   assigned_agent?: number | null;
   assigned_agent_details?: User | null;
   created_at: string;
+  updated_at?: string;
+}
+
+export interface FollowUpHistoryItem {
+  id: number;
+  followup: number;
+  action: string;
+  old_value: string;
+  new_value: string;
+  performed_by: number | null;
+  performed_by_name: string;
+  created_at: string;
+}
+
+export interface FollowUpWidgetStats {
+  totalFollowups: number;
+  upcomingFollowups: number;
+  todayFollowups: number;
+  overdueFollowups: number;
+  completedFollowups: number;
+  successRate: number;
+  completedToday: number;
+  pendingToday: number;
+}
+
+export interface FollowUpAnalytics {
+  byAgent: { agent: string; username: string; total: number; completed: number; overdue: number; completionRate: number }[];
+  byStatus: Record<FollowUpStatus, number>;
+  bySource: { source: string; count: number }[];
+  conversionAfterFollowup: number;
+  avgCompletionHours: number;
+  dailyTrend: { date: string; scheduled: number; completed: number }[];
+  monthlyPerformance: { month: string; total: number; completed: number }[];
 }
 
 export type TaskType =
@@ -864,8 +914,17 @@ export const api = {
   },
 
   // Follow-ups
-  async getFollowUps(): Promise<FollowUp[]> {
-    return request<FollowUp[]>('/followups/');
+  async getFollowUps(params?: {
+    bucket?: 'upcoming' | 'today' | 'overdue' | 'completed' | 'cancelled';
+    agent?: number; lead?: number; followup_type?: string; priority?: string;
+    q?: string; date_from?: string; date_to?: string;
+  }): Promise<FollowUp[]> {
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
+    });
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<FollowUp[]>(`/followups/${suffix}`);
   },
 
   async createFollowUp(followup: Partial<FollowUp>): Promise<FollowUp> {
@@ -880,6 +939,43 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(followup),
     });
+  },
+
+  async deleteFollowUp(id: number): Promise<void> {
+    return request<void>(`/followups/${id}/`, { method: 'DELETE' });
+  },
+
+  async completeFollowUp(id: number, notes?: string): Promise<FollowUp> {
+    return request<FollowUp>(`/followups/${id}/complete/`, {
+      method: 'POST',
+      body: JSON.stringify({ notes: notes || '' }),
+    });
+  },
+
+  async bulkReassignFollowUps(ids: number[], agent: number): Promise<{ updated: number }> {
+    return request<{ updated: number }>('/followups/bulk_reassign/', {
+      method: 'POST',
+      body: JSON.stringify({ ids, agent }),
+    });
+  },
+
+  async bulkRescheduleFollowUps(ids: number[], opts: { scheduled_time?: string; shift_days?: number }): Promise<{ updated: number }> {
+    return request<{ updated: number }>('/followups/bulk_reschedule/', {
+      method: 'POST',
+      body: JSON.stringify({ ids, ...opts }),
+    });
+  },
+
+  async getFollowUpWidgetStats(): Promise<FollowUpWidgetStats> {
+    return request<FollowUpWidgetStats>('/followups/widgets/');
+  },
+
+  async getFollowUpAnalytics(): Promise<FollowUpAnalytics> {
+    return request<FollowUpAnalytics>('/followups/analytics/');
+  },
+
+  async getFollowUpHistory(followupId: number): Promise<FollowUpHistoryItem[]> {
+    return request<FollowUpHistoryItem[]>(`/followup-history/?followup=${followupId}`);
   },
 
   // Activities module entities
