@@ -60,49 +60,49 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="flex items-center justify-between p-6 hover-card-lift animate-fade-in-up opacity-0 glow-primary" style={{ animationDelay: '100ms' }}>
+        <Card className="flex items-center justify-between p-6">
           <div className="flex flex-col text-left">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Leads</span>
-            <span className="text-3xl font-extrabold mt-2 text-foreground">{stats?.totalLeads || 0}</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Leads</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{stats?.totalLeads || 0}</span>
           </div>
-          <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center transition-all duration-300 hover:scale-110">
+          <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center">
             <Briefcase size={22} />
           </div>
         </Card>
 
-        <Card className="flex items-center justify-between p-6 hover-card-lift animate-fade-in-up opacity-0 glow-green" style={{ animationDelay: '150ms' }}>
+        <Card className="flex items-center justify-between p-6">
           <div className="flex flex-col text-left">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Conversion Rate</span>
-            <span className="text-3xl font-extrabold mt-2 text-foreground">{stats?.conversionRate || 0}%</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Conversion Rate</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{stats?.conversionRate || 0}%</span>
           </div>
-          <div className="h-12 w-12 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 flex items-center justify-center transition-all duration-300 hover:scale-110">
+          <div className="h-12 w-12 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 flex items-center justify-center">
             <TrendingUp size={22} />
           </div>
         </Card>
 
-        <Card className="flex items-center justify-between p-6 hover-card-lift animate-fade-in-up opacity-0 glow-blue" style={{ animationDelay: '200ms' }}>
+        <Card className="flex items-center justify-between p-6">
           <div className="flex flex-col text-left">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Pipeline Value</span>
-            <span className="text-3xl font-extrabold mt-2 text-foreground">{formatCurrency(stats?.pipelineValue || 0)}</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pipeline Value</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{formatCurrency(stats?.pipelineValue || 0)}</span>
           </div>
-          <div className="h-12 w-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center transition-all duration-300 hover:scale-110">
+          <div className="h-12 w-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
             <DollarSign size={22} />
           </div>
         </Card>
 
-        <Card className="flex items-center justify-between p-6 hover-card-lift animate-fade-in-up opacity-0 glow-amber" style={{ animationDelay: '250ms' }}>
+        <Card className="flex items-center justify-between p-6">
           <div className="flex flex-col text-left">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Commissions</span>
-            <span className="text-3xl font-extrabold mt-2 text-foreground">{formatCurrency(stats?.earnedCommissions || 0)}</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Commissions</span>
+            <span className="text-3xl font-bold mt-2 text-foreground">{formatCurrency(stats?.earnedCommissions || 0)}</span>
           </div>
-          <div className="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center transition-all duration-300 hover:scale-110">
+          <div className="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
             <DollarSign size={22} />
           </div>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 p-6 hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '300ms' }}>
+        <Card className="lg:col-span-2 p-6">
           <div className="mb-6 flex items-start justify-between gap-3 text-left">
             <div>
               <h3 className="text-base font-semibold text-foreground">Lead Ingestion Timeline</h3>
@@ -111,7 +111,7 @@ export const AdminDashboard: React.FC = () => {
               </p>
             </div>
             <select
-              className="h-10 rounded-xl border border-input bg-muted/20 px-4 py-2 text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer min-w-[140px] transition-all"
+              className="h-10 rounded-xl border border-input bg-muted/20 px-4 py-2 text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer min-w-[140px]"
               value={timelineRange}
               onChange={e => setTimelineRange(e.target.value as 'weekly' | 'monthly')}
             >
@@ -122,7 +122,7 @@ export const AdminDashboard: React.FC = () => {
           {charts && <LineChart data={timelineData} />}
         </Card>
 
-        <Card className="p-6 hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '350ms' }}>
+        <Card className="p-6">
           <div className="mb-6 text-left">
             <h3 className="text-base font-semibold text-foreground">Status Funnel</h3>
             <p className="text-xs text-muted-foreground">Distribution of active pipeline leads</p>
@@ -131,7 +131,7 @@ export const AdminDashboard: React.FC = () => {
         </Card>
       </div>
 
-      <Card className="p-6 text-left hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '400ms' }}>
+      <Card className="p-6 text-left">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Users size={18} className="text-primary" />
@@ -148,8 +148,8 @@ export const AdminDashboard: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {agents.map(agent => (
-              <div key={agent.id} className="flex items-center gap-3 p-3 rounded-lg border border-border/40 bg-muted/10 transition-all duration-300 hover:scale-[1.03] hover:bg-muted/20 cursor-default">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center font-bold text-white text-sm shrink-0 shadow-sm">
+              <div key={agent.id} className="flex items-center gap-3 p-3 rounded-lg border border-border/40 bg-muted/10">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center font-bold text-white text-sm shrink-0">
                   {agent.first_name ? agent.first_name[0] : agent.username[0].toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -163,7 +163,7 @@ export const AdminDashboard: React.FC = () => {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-6 hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '450ms' }}>
+        <Card className="p-6">
           <div className="mb-6 text-left">
             <h3 className="text-base font-semibold text-foreground">Agent Performance Leaderboard</h3>
             <p className="text-xs text-muted-foreground">Revenue and conversion performance ranking</p>
@@ -171,13 +171,13 @@ export const AdminDashboard: React.FC = () => {
           <div className="space-y-3">
             {charts?.leaderboard && charts.leaderboard.length > 0 ? (
               charts.leaderboard.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/10 transition-all duration-300 hover:scale-[1.02] hover:bg-muted/20">
+                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/10">
                   <div className="flex items-center gap-3">
                     <span
                       className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                        idx === 0 ? 'bg-amber-500 text-black shadow-sm' :
-                          idx === 1 ? 'bg-slate-400 text-black shadow-sm' :
-                            idx === 2 ? 'bg-amber-700 text-white shadow-sm' :
+                        idx === 0 ? 'bg-amber-500 text-black' :
+                          idx === 1 ? 'bg-slate-400 text-black' :
+                            idx === 2 ? 'bg-amber-700 text-white' :
                               'bg-muted text-muted-foreground'
                       }`}
                     >
@@ -200,7 +200,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </Card>
 
-        <Card className="p-6 hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '500ms' }}>
+        <Card className="p-6">
           <div className="mb-6 text-left">
             <h3 className="text-base font-semibold text-foreground">Top Lead Sources</h3>
             <p className="text-xs text-muted-foreground">Breakdown of ingestion source tags</p>
@@ -208,7 +208,7 @@ export const AdminDashboard: React.FC = () => {
           <div className="space-y-3">
             {stats?.sourceBreakdown && Object.keys(stats.sourceBreakdown).length > 0 ? (
               Object.entries(stats.sourceBreakdown).map(([source, count], idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/10 transition-all duration-300 hover:scale-[1.02] hover:bg-muted/20">
+                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/10">
                   <span className="text-sm font-semibold text-foreground">{source}</span>
                   <span className="text-xs font-bold bg-muted/50 border border-border/60 px-2.5 py-0.5 rounded-full text-foreground/80">
                     {count} Inquiries

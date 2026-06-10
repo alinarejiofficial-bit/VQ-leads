@@ -116,15 +116,14 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
 
       {/* 7 KPI cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-        {KPI_CARDS.map((card, idx) => {
+        {KPI_CARDS.map(card => {
           const Icon = card.icon;
           return (
             <Card
               key={card.key}
-              className={`p-4 bg-gradient-to-br ${card.gradient} border ${card.border} hover-card-lift animate-fade-in-up opacity-0 cursor-default shadow-sm`}
-              style={{ animationDelay: `${idx * 40}ms` }}
+              className={`p-4 bg-gradient-to-br ${card.gradient} border ${card.border} hover:scale-[1.02] transition-transform cursor-default`}
             >
-              <div className={`h-9 w-9 rounded-lg bg-card/60 border ${card.border} flex items-center justify-center mb-3 transition-all duration-300 hover:scale-110`}>
+              <div className={`h-9 w-9 rounded-lg bg-card/60 border ${card.border} flex items-center justify-center mb-3`}>
                 <Icon size={18} className={card.iconColor} />
               </div>
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider leading-tight">
@@ -140,7 +139,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2 p-5 text-left hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '300ms' }}>
+        <Card className="lg:col-span-2 p-5 text-left">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-foreground">Activity Overview</h3>
@@ -148,17 +147,17 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
             </div>
             <div className="flex gap-4 text-[10px] font-semibold">
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" /> Calls
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Calls
               </span>
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" /> Conversions
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Conversions
               </span>
             </div>
           </div>
           <LineChart data={charts.activityTimeline} />
         </Card>
 
-        <Card className="p-5 text-left hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '340ms' }}>
+        <Card className="p-5 text-left">
           <h3 className="text-sm font-bold text-foreground mb-1">Pipeline Breakdown</h3>
           <p className="text-xs text-muted-foreground mb-2">Lead status distribution</p>
           <DonutChart data={donutData.length > 0 ? donutData : [{ label: 'No leads', value: 1, color: '#334155' }]} />
@@ -166,7 +165,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="p-5 text-left hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '380ms' }}>
+        <Card className="p-5 text-left">
           <h3 className="text-sm font-bold text-foreground mb-1">Monthly Revenue</h3>
           <p className="text-xs text-muted-foreground mb-4">Won deals revenue trend</p>
           <BarChart
@@ -177,7 +176,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
           />
         </Card>
 
-        <Card className="p-5 text-left hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '420ms' }}>
+        <Card className="p-5 text-left">
           <h3 className="text-sm font-bold text-foreground mb-4">This Month at a Glance</h3>
           <div className="grid grid-cols-2 gap-3">
             {[
@@ -188,8 +187,8 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
             ].map(item => {
               const Icon = item.icon;
               return (
-                <div key={item.label} className="p-4 rounded-xl border border-border/40 bg-muted/10 flex items-center gap-3 transition-all duration-300 hover:scale-[1.03] hover:bg-muted/20">
-                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center transition-transform duration-300 hover:scale-115 ${item.color}`}>
+                <div key={item.label} className="p-4 rounded-xl border border-border/40 bg-muted/10 flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${item.color}`}>
                     <Icon size={18} />
                   </div>
                   <div>
@@ -204,9 +203,9 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
       </div>
 
       {/* Hot Leads */}
-      <Card className="overflow-hidden text-left hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '460ms' }}>
+      <Card className="overflow-hidden text-left">
         <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2 bg-gradient-to-r from-orange-500/10 to-transparent">
-          <Flame size={16} className="text-orange-400 animate-pulse" />
+          <Flame size={16} className="text-orange-400" />
           <h3 className="text-sm font-bold text-foreground">Hot Leads</h3>
         </div>
         {hotLeads.length === 0 ? (
@@ -226,7 +225,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
                 {hotLeads.map(lead => (
                   <tr
                     key={lead.id}
-                    className="border-b border-border/20 hover:bg-muted/30 cursor-pointer transition-colors"
+                    className="border-b border-border/20 hover:bg-muted/20 cursor-pointer transition-colors"
                     onClick={() => navigate('/leads')}
                   >
                     <td className="px-5 py-3 font-semibold text-foreground">{lead.name}</td>
@@ -246,7 +245,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="text-left hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '500ms' }}>
+        <Card className="text-left">
           <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2">
             <Calendar size={16} className="text-blue-400" />
             <h3 className="text-sm font-bold text-foreground">Today&apos;s Follow-ups</h3>
@@ -256,7 +255,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
               <p className="text-sm text-muted-foreground py-4 text-center">No follow-ups scheduled for today.</p>
             ) : (
               todaysFollowups.map(f => (
-                <div key={f.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/40 bg-muted/10 transition-all duration-300 hover:scale-[1.02] hover:bg-muted/20">
+                <div key={f.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/40 bg-muted/10">
                   <span className="text-xs font-bold text-primary whitespace-nowrap mt-0.5">{f.time}</span>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{f.leadName}</p>
@@ -268,7 +267,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
           </div>
         </Card>
 
-        <Card className="text-left hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '540ms' }}>
+        <Card className="text-left">
           <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2">
             <CheckSquare size={16} className="text-green-400" />
             <h3 className="text-sm font-bold text-foreground">Today&apos;s Tasks</h3>
@@ -278,7 +277,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
               <p className="text-sm text-muted-foreground py-4 text-center">No pending tasks.</p>
             ) : (
               todaysTasks.map(t => (
-                <div key={t.id} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/10 transition-all duration-300 hover:scale-[1.02] hover:bg-muted/20">
+                <div key={t.id} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/10">
                   <span className="text-sm font-medium text-foreground">{t.title}</span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase shrink-0 ml-2 ${priorityClass(t.priority)}`}>
                     {t.priority}
@@ -291,7 +290,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="text-left hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '580ms' }}>
+        <Card className="text-left">
           <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2">
             <Activity size={16} className="text-primary" />
             <h3 className="text-sm font-bold text-foreground">Recent Activities</h3>
@@ -301,7 +300,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
               <p className="text-sm text-muted-foreground py-4 text-center">No recent activity.</p>
             ) : (
               recentActivities.map(a => (
-                <div key={a.id} className="flex items-start gap-3 py-2 border-b border-border/20 last:border-0 transition-all duration-300 hover:translate-x-1">
+                <div key={a.id} className="flex items-start gap-3 py-2 border-b border-border/20 last:border-0">
                   <Phone size={13} className="text-muted-foreground mt-0.5 shrink-0" />
                   <div className="min-w-0">
                     <span className="text-[10px] font-bold text-muted-foreground">{a.time}</span>
@@ -313,9 +312,9 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
           </div>
         </Card>
 
-        <Card className="text-left border-red-500/20 hover-card-lift animate-fade-in-up opacity-0 shadow-sm" style={{ animationDelay: '620ms' }}>
+        <Card className="text-left border-red-500/20">
           <div className="px-5 py-4 border-b border-border/40 flex items-center gap-2 bg-gradient-to-r from-red-500/10 to-transparent">
-            <AlertTriangle size={16} className="text-red-400 animate-bounce" />
+            <AlertTriangle size={16} className="text-red-400" />
             <h3 className="text-sm font-bold text-foreground">
               Overdue Follow-ups {overdueFollowups.length > 0 && `(${overdueFollowups.length})`}
             </h3>
@@ -325,7 +324,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
               <p className="text-sm text-muted-foreground py-4 text-center">You&apos;re all caught up!</p>
             ) : (
               overdueFollowups.map(f => (
-                <div key={f.id} className="flex items-center justify-between p-3 rounded-lg border border-red-500/20 bg-red-500/5 transition-all duration-300 hover:scale-[1.02] hover:bg-red-500/10">
+                <div key={f.id} className="flex items-center justify-between p-3 rounded-lg border border-red-500/20 bg-red-500/5">
                   <span className="text-sm font-semibold text-foreground">{f.leadName}</span>
                   <span className="text-xs font-bold text-red-400">{f.overdueLabel}</span>
                 </div>

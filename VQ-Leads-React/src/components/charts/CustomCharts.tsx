@@ -48,40 +48,28 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
     return { x, y1, y2, ...d };
   });
 
-  // Build path for Line 1 (Total Leads) - Green (Smooth Bezier Curve)
+  // Build path for Line 1 (Total Leads) - Green
   let pathD1 = '';
   let areaD1 = '';
   if (points.length > 0) {
     pathD1 = `M ${points[0].x} ${points[0].y1}`;
-    for (let i = 1; i < points.length; i++) {
-      const p0 = points[i - 1];
-      const p1 = points[i];
-      const cpX1 = p0.x + (p1.x - p0.x) / 3;
-      const cpY1 = p0.y1;
-      const cpX2 = p1.x - (p1.x - p0.x) / 3;
-      const cpY2 = p1.y1;
-      pathD1 += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y1}`;
-    }
     areaD1 = `M ${points[0].x} ${height - padding.bottom}`;
+    for (let i = 1; i < points.length; i++) {
+      pathD1 += ` L ${points[i].x} ${points[i].y1}`;
+    }
     areaD1 += pathD1.substring(1);
     areaD1 += ` L ${points[points.length - 1].x} ${height - padding.bottom} Z`;
   }
 
-  // Build path for Line 2 (Converted Leads) - Blue (Smooth Bezier Curve)
+  // Build path for Line 2 (Converted Leads) - Blue
   let pathD2 = '';
   let areaD2 = '';
   if (points.length > 0) {
     pathD2 = `M ${points[0].x} ${points[0].y2}`;
-    for (let i = 1; i < points.length; i++) {
-      const p0 = points[i - 1];
-      const p1 = points[i];
-      const cpX1 = p0.x + (p1.x - p0.x) / 3;
-      const cpY1 = p0.y2;
-      const cpX2 = p1.x - (p1.x - p0.x) / 3;
-      const cpY2 = p1.y2;
-      pathD2 += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y2}`;
-    }
     areaD2 = `M ${points[0].x} ${height - padding.bottom}`;
+    for (let i = 1; i < points.length; i++) {
+      pathD2 += ` L ${points[i].x} ${points[i].y2}`;
+    }
     areaD2 += pathD2.substring(1);
     areaD2 += ` L ${points[points.length - 1].x} ${height - padding.bottom} Z`;
   }
@@ -206,8 +194,8 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
         })}
 
         {/* Shaded Areas */}
-        {areaD1 && <path d={areaD1} fill="url(#totalGlow)" className="animate-fade-in opacity-0" style={{ animationDelay: '1.2s' }} />}
-        {areaD2 && <path d={areaD2} fill="url(#convertedGlow)" className="animate-fade-in opacity-0" style={{ animationDelay: '1.4s' }} />}
+        {areaD1 && <path d={areaD1} fill="url(#totalGlow)" />}
+        {areaD2 && <path d={areaD2} fill="url(#convertedGlow)" />}
 
         {/* Lines */}
         {pathD1 && (
@@ -218,7 +206,6 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
             strokeWidth="2.5" 
             strokeLinecap="round" 
             strokeLinejoin="round" 
-            className="animate-draw-line"
           />
         )}
         {pathD2 && (
@@ -229,8 +216,6 @@ export const LineChart: React.FC<LineChartProps> = ({ data }) => {
             strokeWidth="2.5" 
             strokeLinecap="round" 
             strokeLinejoin="round" 
-            className="animate-draw-line"
-            style={{ animationDelay: '200ms' }}
           />
         )}
 
@@ -273,12 +258,6 @@ interface DonutChartProps {
 }
 
 export const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
-  const [animate, setAnimate] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setAnimate(true), 50);
-    return () => clearTimeout(timer);
-  }, []);
-
   if (!data || data.length === 0 || data.every(d => d.value === 0)) {
     return <div className="text-center text-xs text-muted-foreground py-10">No source data available</div>;
   }
@@ -308,7 +287,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
             if (item.value === 0) return null;
             const percentage = item.value / total;
             const strokeDasharray = `${percentage * circumference} ${circumference}`;
-            const strokeDashoffset = animate ? (-accumulatedPercent * circumference) : circumference;
+            const strokeDashoffset = -accumulatedPercent * circumference;
             accumulatedPercent += percentage;
 
             return (
@@ -322,11 +301,8 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
                 strokeWidth={strokeWidth}
                 strokeDasharray={strokeDasharray}
                 strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-                style={{ 
-                  transition: 'stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1)',
-                  transformOrigin: 'center' 
-                }}
+                strokeLinecap="butt"
+                style={{ transition: 'stroke-dashoffset 0.5s ease' }}
               />
             );
           })}
@@ -376,12 +352,6 @@ interface BarChartProps {
 }
 
 export const BarChart: React.FC<BarChartProps> = ({ data }) => {
-  const [animate, setAnimate] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setAnimate(true), 50);
-    return () => clearTimeout(timer);
-  }, []);
-
   if (!data || data.length === 0 || data.every(d => d.value === 0)) {
     return <div className="text-center text-xs text-muted-foreground py-10">No data available</div>;
   }
@@ -391,7 +361,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data }) => {
   return (
     <div className="flex items-end justify-between gap-2 h-[200px] pt-2 px-1">
       {data.map((item, idx) => {
-        const heightPct = animate ? ((item.value / maxVal) * 100) : 0;
+        const heightPct = (item.value / maxVal) * 100;
         const color = item.color || '#3b82f6';
         return (
           <div key={idx} className="flex flex-col items-center flex-1 gap-2 min-w-0">
@@ -400,12 +370,11 @@ export const BarChart: React.FC<BarChartProps> = ({ data }) => {
             </span>
             <div className="w-full flex justify-center items-end h-[130px]">
               <div
-                className="w-full max-w-[36px] rounded-t-lg transition-all duration-700 shadow-lg"
+                className="w-full max-w-[36px] rounded-t-lg transition-all duration-500 shadow-lg"
                 style={{
                   height: `${Math.max(heightPct, 4)}%`,
                   background: `linear-gradient(180deg, ${color} 0%, ${color}88 100%)`,
                   boxShadow: `0 4px 14px ${color}33`,
-                  transitionDelay: `${idx * 50}ms`,
                 }}
               />
             </div>
