@@ -226,6 +226,84 @@ class AgentTrackingView(APIView):
         return Response(result)
 
 
+class TeamPerformanceView(APIView):
+    permission_classes = [IsAdminUserRole]
+
+    CHART_COLORS = ['#f59e0b', '#94a3b8', '#b45309', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4']
+
+    def get(self, request):
+        members_qs = User.objects.filter(
+            profile__role__in=['AGENT', 'LEADER'],
+            is_active=True,
+        ).order_by('first_name', 'username')
+
+        members = []
+        for agent in members_qs:
+            leads_qs = Lead.objects.filter(owner=agent)
+            leads_claimed = leads_qs.count()
+            conversions = leads_qs.filter(status='WON').count()
+            revenue = float(
+                leads_qs.filter(status='WON').aggregate(total=Sum('value'))['total'] or Decimal('0.00')
+            )
+            calls = LeadActivity.objects.filter(
+                lead__owner=agent,
+                description__startswith='[CALL]',
+            ).count()
+            conversion_rate = round((conversions / leads_claimed * 100), 1) if leads_claimed > 0 else 0.0
+
+            members.append({
+                'agentId': agent.id,
+                'agent': f"{agent.first_name} {agent.last_name}".strip() or agent.username,
+                'username': agent.username,
+                'leadsClaimed': leads_claimed,
+                'calls': calls,
+                'conversions': conversions,
+                'revenue': revenue,
+                'conversionRate': conversion_rate,
+            })
+
+        members.sort(key=lambda x: x['revenue'], reverse=True)
+
+        def short_label(name: str, username: str) -> str:
+            return name.split()[0] if name else username
+
+        def chart_bars(key: str, limit: int = 6):
+            sorted_members = sorted(members, key=lambda x: x[key], reverse=True)[:limit]
+            return [
+                {
+                    'label': short_label(m['agent'], m['username']),
+                    'value': m[key],
+                    'color': self.CHART_COLORS[i % len(self.CHART_COLORS)],
+                }
+                for i, m in enumerate(sorted_members)
+            ]
+
+        top_performers = sorted(members, key=lambda x: x['conversions'], reverse=True)[:5]
+
+        return Response({
+            'members': members,
+            'totals': {
+                'leadsClaimed': sum(m['leadsClaimed'] for m in members),
+                'calls': sum(m['calls'] for m in members),
+                'conversions': sum(m['conversions'] for m in members),
+                'revenue': sum(m['revenue'] for m in members),
+            },
+            'charts': {
+                'topPerformers': [
+                    {
+                        'label': short_label(m['agent'], m['username']),
+                        'value': m['conversions'],
+                        'color': self.CHART_COLORS[i % len(self.CHART_COLORS)],
+                    }
+                    for i, m in enumerate(top_performers)
+                ],
+                'conversionRate': chart_bars('conversionRate'),
+                'revenueGenerated': chart_bars('revenue'),
+                'callsMade': chart_bars('calls'),
+            },
+        })
+
+
 # Lead ViewSet
 class LeadViewSet(viewsets.ModelViewSet):
     serializer_class = LeadSerializer

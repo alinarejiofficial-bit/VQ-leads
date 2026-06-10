@@ -9,6 +9,7 @@ import { Dialog } from '../../components/common/Dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/datatable/Table';
 import { Plus, Pencil, KeyRound, UserCheck, UserX } from 'lucide-react';
 import { RolesTab } from './RolesTab';
+import { PerformanceTab } from './PerformanceTab';
 import { ASSIGNABLE_MEMBER_ROLES, getRoleBadgeClass, getRoleLabel, type RoleId } from './rolesConfig';
 
 export const Teams: React.FC = () => {
@@ -139,7 +140,8 @@ export const Teams: React.FC = () => {
       email: agentEmail,
       first_name: agentFirst,
       last_name: agentLast,
-      commission_rate: agentComm
+      commission_rate: agentComm,
+      role: agentRole,
     });
   };
 
@@ -149,6 +151,7 @@ export const Teams: React.FC = () => {
     setEditLast(member.last_name);
     setEditEmail(member.email);
     setEditComm(member.profile.commission_rate);
+    setEditRole(member.profile.role === 'LEADER' ? 'LEADER' : 'AGENT');
   };
 
   const handleEditMember = (e: React.FormEvent) => {
@@ -161,6 +164,7 @@ export const Teams: React.FC = () => {
         last_name: editLast,
         email: editEmail,
         commission_rate: editComm,
+        role: editRole,
       },
     });
   };
@@ -232,6 +236,7 @@ export const Teams: React.FC = () => {
                     <TableHead>Name</TableHead>
                     <TableHead>Username</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
                     <TableHead>Commission</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -240,7 +245,7 @@ export const Teams: React.FC = () => {
                 <TableBody>
                   {agents.length === 0 ? (
                     <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
                         No team members yet. Click &quot;Add Member&quot; to get started.
                       </TableCell>
                     </TableRow>
@@ -250,6 +255,11 @@ export const Teams: React.FC = () => {
                         <TableCell className="font-semibold text-foreground">{member.full_name}</TableCell>
                         <TableCell className="text-muted-foreground">@{member.username}</TableCell>
                         <TableCell>{member.email || '—'}</TableCell>
+                        <TableCell>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${getRoleBadgeClass(member.profile.role)}`}>
+                            {getRoleLabel(member.profile.role)}
+                          </span>
+                        </TableCell>
                         <TableCell>{member.profile.commission_rate}%</TableCell>
                         <TableCell>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
@@ -355,17 +365,9 @@ export const Teams: React.FC = () => {
         </div>
       )}
 
-      {tab === 'roles' && (
-        <div className="p-6 bg-card rounded-xl border border-border/40 text-muted-foreground text-left">
-          <p>This is the Roles view. Here you can configure permissions and access levels for different team roles.</p>
-        </div>
-      )}
+      {tab === 'roles' && <RolesTab members={agents} />}
 
-      {tab === 'performance' && (
-        <div className="p-6 bg-card rounded-xl border border-border/40 text-muted-foreground text-left">
-          <p>This is the Performance view. Shows team metrics, conversion rates, and leaderboard.</p>
-        </div>
-      )}
+      {tab === 'performance' && <PerformanceTab />}
 
       {/* Create Team Modal */}
       <Dialog isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Sales Team">
@@ -451,6 +453,18 @@ export const Teams: React.FC = () => {
               <Input type="number" step="0.01" value={agentComm} onChange={e => setAgentComm(e.target.value)} />
             </div>
           </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Role</label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
+              value={agentRole}
+              onChange={e => setAgentRole(e.target.value as RoleId)}
+            >
+              {ASSIGNABLE_MEMBER_ROLES.map(r => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
             <Button type="button" variant="outline" onClick={() => setIsAddMemberOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={addMemberMutation.isPending}>
@@ -486,6 +500,18 @@ export const Teams: React.FC = () => {
               <label className="text-xs font-semibold text-foreground">Commission Rate (%)</label>
               <Input type="number" step="0.01" value={editComm} onChange={e => setEditComm(e.target.value)} />
             </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground">Role</label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
+              value={editRole}
+              onChange={e => setEditRole(e.target.value as RoleId)}
+            >
+              {ASSIGNABLE_MEMBER_ROLES.map(r => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
             <Button type="button" variant="outline" onClick={() => setEditingMember(null)}>Cancel</Button>

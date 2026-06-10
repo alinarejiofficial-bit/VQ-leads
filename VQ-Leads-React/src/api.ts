@@ -94,6 +94,39 @@ export interface AgentTrackingDetail {
   activities: LeadActivity[];
 }
 
+export interface TeamPerformanceMember {
+  agentId: number;
+  agent: string;
+  username: string;
+  leadsClaimed: number;
+  calls: number;
+  conversions: number;
+  revenue: number;
+  conversionRate: number;
+}
+
+export interface TeamPerformanceChartBar {
+  label: string;
+  value: number;
+  color: string;
+}
+
+export interface TeamPerformanceData {
+  members: TeamPerformanceMember[];
+  totals: {
+    leadsClaimed: number;
+    calls: number;
+    conversions: number;
+    revenue: number;
+  };
+  charts: {
+    topPerformers: TeamPerformanceChartBar[];
+    conversionRate: TeamPerformanceChartBar[];
+    revenueGenerated: TeamPerformanceChartBar[];
+    callsMade: TeamPerformanceChartBar[];
+  };
+}
+
 export interface FollowUp {
   id: number;
   lead: number;
@@ -305,7 +338,7 @@ export const api = {
     });
   },
 
-  async updateAgent(id: number, data: Partial<User> & { commission_rate?: string }): Promise<User> {
+  async updateAgent(id: number, data: Partial<User> & { commission_rate?: string; role?: UserProfile['role'] }): Promise<User> {
     return request<User>(`/agents/${id}/`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -332,6 +365,10 @@ export const api = {
 
   async getAgentTrackingDetail(agentId: number): Promise<AgentTrackingDetail> {
     return request<AgentTrackingDetail>(`/agents/tracking/?agent_id=${agentId}`);
+  },
+
+  async getTeamPerformance(): Promise<TeamPerformanceData> {
+    return request<TeamPerformanceData>('/team/performance/');
   },
 
   // Leads
