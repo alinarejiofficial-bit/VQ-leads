@@ -60,7 +60,12 @@ class FollowUpWidgetStatsView(APIView):
         completed = qs.filter(status='COMPLETED').count()
         overdue = active.filter(scheduled_time__lt=now).count()
         due_today = active.filter(scheduled_time__date=today).count()
-        upcoming = active.filter(scheduled_time__gte=now).exclude(scheduled_time__date=today).count()
+        upcoming = active.filter(scheduled_time__gte=now).exclude(scheduled_time__date=today)
+        tomorrow = today + datetime.timedelta(days=1)
+        week_end = today + datetime.timedelta(days=7)
+        upcoming_tomorrow = upcoming.filter(scheduled_time__date=tomorrow).count()
+        upcoming_this_week = upcoming.filter(scheduled_time__date__lte=week_end).count()
+        upcoming_high_priority = upcoming.filter(priority__in=['HIGH', 'URGENT']).count()
         completed_today = qs.filter(status='COMPLETED', completed_at__date=today).count()
         pending_today = active.filter(scheduled_time__date=today, scheduled_time__gte=now).count()
 
@@ -69,7 +74,10 @@ class FollowUpWidgetStatsView(APIView):
 
         return Response({
             'totalFollowups': total,
-            'upcomingFollowups': upcoming,
+            'upcomingFollowups': upcoming.count(),
+            'upcomingTomorrow': upcoming_tomorrow,
+            'upcomingThisWeek': upcoming_this_week,
+            'upcomingHighPriority': upcoming_high_priority,
             'todayFollowups': due_today,
             'overdueFollowups': overdue,
             'completedFollowups': completed,

@@ -240,9 +240,9 @@ export const AdminDashboard: React.FC = () => {
             <PanelHeader title="Today's Follow-ups" />
             <div className="space-y-2">
               {[
-                { label: 'Overdue', count: followups?.overdueFollowups || 0, color: 'text-red-600', bg: 'bg-red-50', path: '/followups?bucket=overdue' },
-                { label: 'Due Today', count: followups?.todayFollowups || 0, color: 'text-orange-600', bg: 'bg-orange-50', path: '/followups?bucket=today' },
-                { label: 'Upcoming', count: followups?.upcomingFollowups || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', path: '/followups?bucket=upcoming' },
+                { label: 'Overdue', count: followups?.overdueFollowups || 0, color: 'text-red-600', bg: 'bg-red-50', path: '/followups?filter=overdue' },
+                { label: 'Due Today', count: followups?.todayFollowups || 0, color: 'text-orange-600', bg: 'bg-orange-50', path: '/followups?filter=today' },
+                { label: 'Upcoming', count: followups?.upcomingFollowups || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', path: '/followups?filter=upcoming' },
               ].map(row => (
                 <button
                   key={row.label}

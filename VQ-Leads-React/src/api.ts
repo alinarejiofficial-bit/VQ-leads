@@ -244,6 +244,8 @@ export interface FollowUp {
   lead_phone?: string;
   lead_email?: string;
   lead_source?: string;
+  lead_company?: string;
+  lead_status?: string;
   scheduled_time: string;
   followup_type: FollowUpType;
   priority: FollowUpPriority;
@@ -278,6 +280,9 @@ export interface FollowUpHistoryItem {
 export interface FollowUpWidgetStats {
   totalFollowups: number;
   upcomingFollowups: number;
+  upcomingTomorrow?: number;
+  upcomingThisWeek?: number;
+  upcomingHighPriority?: number;
   todayFollowups: number;
   overdueFollowups: number;
   completedFollowups: number;
@@ -714,31 +719,191 @@ export interface AgentDashboardData {
 }
 
 // Request helpers
-function getHeaders(): HeadersInit {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-  const token = localStorage.getItem('vq_token');
+const TOKEN_KEY = 'vq_token';
+const REFRESH_KEY = 'vq_refresh';
+const USER_KEY = 'vq_user';
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+
+function clearAuth() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+  localStorage.removeItem(USER_KEY);
+  window.dispatchEvent(new Event('auth_change'));
+}
+
+function getTokenExpiryMs(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpiringSoon(token: string, withinMs = REFRESH_BUFFER_MS): boolean {
+  const exp = getTokenExpiryMs(token);
+  if (!exp) return false;
+  return exp - Date.now() <= withinMs;
+}
+
+function persistTokens(access: string, refresh?: string) {
+  localStorage.setItem(TOKEN_KEY, access);
+  if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
+  scheduleProactiveRefresh(access);
+  window.dispatchEvent(new Event('auth_change'));
+}
+
+let refreshInFlight: Promise<string | null> | null = null;
+let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let authSessionInitialized = false;
+
+function scheduleProactiveRefresh(accessToken: string) {
+  if (proactiveRefreshTimer) {
+    clearTimeout(proactiveRefreshTimer);
+    proactiveRefreshTimer = null;
+  }
+
+  const exp = getTokenExpiryMs(accessToken);
+  if (!exp) return;
+
+  const delay = Math.max(exp - Date.now() - REFRESH_BUFFER_MS, 0);
+  proactiveRefreshTimer = setTimeout(async () => {
+    try {
+      const next = await refreshAccessToken();
+      if (next) scheduleProactiveRefresh(next);
+    } catch {
+      // Keep the session; a later API call or focus handler will retry refresh.
+    }
+  }, delay);
+}
+
+type RefreshOutcome =
+  | { status: 'ok'; access: string }
+  | { status: 'invalid' }
+  | { status: 'missing' };
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refresh = localStorage.getItem(REFRESH_KEY);
+  if (!refresh) return null;
+
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const response = await fetch(`${API_BASE}/auth/refresh/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh }),
+        });
+
+        if (response.status === 401 || response.status === 403) {
+          return null;
+        }
+        if (!response.ok) {
+          throw new Error(`Refresh failed with status ${response.status}`);
+        }
+
+        const data = await response.json() as { access: string; refresh?: string };
+        persistTokens(data.access, data.refresh);
+        return data.access;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+
+  return refreshInFlight;
+}
+
+async function tryRefreshSession(): Promise<RefreshOutcome> {
+  if (!localStorage.getItem(REFRESH_KEY)) return { status: 'missing' };
+
+  try {
+    const access = await refreshAccessToken();
+    return access ? { status: 'ok', access } : { status: 'invalid' };
+  } catch {
+    throw new Error('Refresh temporarily unavailable');
+  }
+}
+
+export function initAuthSession() {
+  if (authSessionInitialized || typeof window === 'undefined') return;
+  authSessionInitialized = true;
+
+  const access = localStorage.getItem(TOKEN_KEY);
+  const refresh = localStorage.getItem(REFRESH_KEY);
+  if (access) scheduleProactiveRefresh(access);
+
+  if (access && refresh && isTokenExpiringSoon(access)) {
+    refreshAccessToken().catch(() => {});
+  }
+
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    const token = localStorage.getItem(TOKEN_KEY);
+    const storedRefresh = localStorage.getItem(REFRESH_KEY);
+    if (!token || !storedRefresh) return;
+    if (isTokenExpiringSoon(token)) {
+      refreshAccessToken().catch(() => {});
+    }
+  });
+
+  window.addEventListener('online', () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const storedRefresh = localStorage.getItem(REFRESH_KEY);
+    if (!token || !storedRefresh) return;
+    if (isTokenExpiringSoon(token, REFRESH_BUFFER_MS * 2)) {
+      refreshAccessToken().catch(() => {});
+    }
+  });
+}
+
+function isAuthExemptPath(path: string) {
+  return path.startsWith('/auth/login/') || path.startsWith('/auth/refresh/');
+}
+
+function getHeaders(includeJsonContentType = true): HeadersInit {
+  const headers: HeadersInit = {};
+  if (includeJsonContentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const token = localStorage.getItem(TOKEN_KEY);
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function authorizedFetch(path: string, options: RequestInit = {}, retried = false): Promise<Response> {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      ...getHeaders(),
+      ...getHeaders(!isFormData),
       ...options.headers,
     },
   });
 
-  if (response.status === 401) {
-    localStorage.removeItem('vq_token');
-    localStorage.removeItem('vq_user');
-    window.dispatchEvent(new Event('auth_change'));
+  if (response.status === 401 && !isAuthExemptPath(path) && !retried) {
+    try {
+      const refresh = await tryRefreshSession();
+      if (refresh.status === 'ok') {
+        return authorizedFetch(path, options, true);
+      }
+      if (refresh.status === 'invalid' || refresh.status === 'missing') {
+        clearAuth();
+      }
+    } catch {
+      // Temporary refresh failure (network/server) — keep the session alive.
+    }
+  } else if (response.status === 401 && !isAuthExemptPath(path) && retried) {
+    clearAuth();
   }
+
+  return response;
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await authorizedFetch(path, options);
 
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
@@ -755,13 +920,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 function uploadFormData<T>(
   path: string,
   body: FormData,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  retried = false
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${API_BASE}${path}`);
 
-    const token = localStorage.getItem('vq_token');
+    const token = localStorage.getItem(TOKEN_KEY);
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
     xhr.upload.onprogress = evt => {
@@ -770,7 +936,24 @@ function uploadFormData<T>(
       onProgress(percent);
     };
 
-    xhr.onload = () => {
+    xhr.onload = async () => {
+      if (xhr.status === 401 && !retried) {
+        try {
+          const refresh = await tryRefreshSession();
+          if (refresh.status === 'ok') {
+            uploadFormData<T>(path, body, onProgress, true).then(resolve).catch(reject);
+            return;
+          }
+          if (refresh.status === 'invalid' || refresh.status === 'missing') {
+            clearAuth();
+          }
+        } catch {
+          // Keep session on transient refresh errors.
+        }
+      } else if (xhr.status === 401 && retried) {
+        clearAuth();
+      }
+
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           resolve(JSON.parse(xhr.responseText) as T);
@@ -967,22 +1150,20 @@ export interface ApiIntegrationsData {
 // API methods
 export const api = {
   // Auth
-  async login(username: string, password: string): Promise<{ token: string; user: User }> {
-    const data = await request<{ token: string; user: User }>('/auth/login/', {
+  async login(username: string, password: string): Promise<{ token: string; refresh: string; user: User }> {
+    const data = await request<{ token: string; refresh: string; user: User }>('/auth/login/', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
-    localStorage.setItem('vq_token', data.token);
-    localStorage.setItem('vq_user', JSON.stringify(data.user));
+    persistTokens(data.token, data.refresh);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
     window.dispatchEvent(new Event('auth_change'));
     return data;
   },
 
   logout(): void {
     request('/auth/logout/', { method: 'POST' }).catch(() => {});
-    localStorage.removeItem('vq_token');
-    localStorage.removeItem('vq_user');
-    window.dispatchEvent(new Event('auth_change'));
+    clearAuth();
   },
 
   async getMe(): Promise<User> {
@@ -1467,9 +1648,7 @@ export const api = {
   },
 
   async downloadImportErrorReport(id: number): Promise<Blob> {
-    const response = await fetch(`${API_BASE}/import-history/${id}/error-report/`, {
-      headers: getHeaders(),
-    });
+    const response = await authorizedFetch(`/import-history/${id}/error-report/`);
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error || 'Failed to download report');
@@ -1524,9 +1703,7 @@ export const api = {
   },
 
   async downloadExportFile(id: number): Promise<Blob> {
-    const response = await fetch(`${API_BASE}/export-history/${id}/download/`, {
-      headers: getHeaders(),
-    });
+    const response = await authorizedFetch(`/export-history/${id}/download/`);
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error || 'Failed to download export');
@@ -1593,13 +1770,8 @@ export const api = {
     fileType: 'csv' | 'xlsx' | 'pdf',
     filters?: ReportsFilters
   ): Promise<Blob> {
-    const token = localStorage.getItem('vq_token');
-    const response = await fetch(`${API_BASE}/reports/export/`, {
+    const response = await authorizedFetch('/reports/export/', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
       body: JSON.stringify({ reportType, fileType, ...(filters || {}) }),
     });
     if (!response.ok) {
@@ -1633,13 +1805,8 @@ export const api = {
   },
 
   async exportAuditLogs(fileType: 'csv' | 'xlsx' | 'pdf', filters?: AuditLogQuery): Promise<Blob> {
-    const token = localStorage.getItem('vq_token');
-    const response = await fetch(`${API_BASE}/audit-logs/export/`, {
+    const response = await authorizedFetch('/audit-logs/export/', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
       body: JSON.stringify({ fileType, filters: filters || {} }),
     });
     if (!response.ok) {
@@ -1672,10 +1839,8 @@ export const api = {
   async uploadCompanyLogo(file: File): Promise<{ companyLogo: string }> {
     const form = new FormData();
     form.append('logo', file);
-    const token = localStorage.getItem('vq_token');
-    const response = await fetch(`${API_BASE}/settings/general/logo/`, {
+    const response = await authorizedFetch('/settings/general/logo/', {
       method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,
     });
     if (!response.ok) {

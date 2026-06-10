@@ -198,7 +198,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
     return <ImportModule />;
   }
   if (isAdmin && action === 'export') {
-    return <ExportModule leads={leads} />;
+    return <ExportModule leads={leads} filteredLeadIds={filteredLeads.map(l => l.id)} />;
   }
 
   return (

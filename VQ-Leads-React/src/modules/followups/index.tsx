@@ -14,6 +14,7 @@ import {
   Calendar, CalendarDays, CheckCircle2, Clock, AlertTriangle, Phone, Mail,
   ChevronLeft, ChevronRight, X, Plus, History, Bell, TrendingUp, Target,
 } from 'lucide-react';
+import { UpcomingFollowUpsView } from './UpcomingFollowUpsView';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -690,7 +691,10 @@ export const FollowUps: React.FC = () => {
 
   const tab: TabId = (searchParams.get('view') === 'calendar')
     ? 'calendar'
-    : ((searchParams.get('filter') as TabId) || (searchParams.get('tab') as TabId) || 'upcoming');
+    : ((searchParams.get('filter') as TabId)
+      || (searchParams.get('tab') as TabId)
+      || (searchParams.get('bucket') as TabId)
+      || 'upcoming');
 
   const [search, setSearch] = useState('');
   const [agentFilter, setAgentFilter] = useState<number | ''>('');
@@ -707,6 +711,14 @@ export const FollowUps: React.FC = () => {
     setBulkIds([]);
     navigate(t === 'calendar' ? '/followups?view=calendar' : `/followups?filter=${t}`);
   };
+
+  // Normalize legacy `?bucket=` links from dashboard into active tab
+  React.useEffect(() => {
+    const bucket = searchParams.get('bucket');
+    if (bucket && !searchParams.get('filter') && ['upcoming', 'today', 'overdue'].includes(bucket)) {
+      navigate(`/followups?filter=${bucket}`, { replace: true });
+    }
+  }, [location.search, navigate, searchParams]);
 
   // ── Queries ──
   const { data: stats } = useQuery<FollowUpWidgetStats>({
@@ -771,6 +783,12 @@ export const FollowUps: React.FC = () => {
     onSuccess: () => { invalidate(); setBulkIds([]); },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: api.deleteFollowUp,
+    onSuccess: () => { invalidate(); setSelected(null); },
+    onError: (e: Error) => alert(e.message || 'Failed to delete follow-up'),
+  });
+
   const handleComplete = (id: number) => {
     const notes = window.prompt('Add completion notes (optional):') || undefined;
     completeMutation.mutate({ id, notes });
@@ -823,7 +841,8 @@ export const FollowUps: React.FC = () => {
         </Button>
       </div>
 
-      {/* Widgets */}
+      {/* Widgets — hidden on dedicated upcoming page */}
+      {tab !== 'upcoming' && (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {widgets.map((w, idx) => {
           const Icon = w.icon;
@@ -840,6 +859,7 @@ export const FollowUps: React.FC = () => {
           );
         })}
       </div>
+      )}
 
       {/* Create form */}
       {showForm && (
@@ -894,8 +914,22 @@ export const FollowUps: React.FC = () => {
         </div>
       )}
 
-      {/* Filters */}
-      {(tab === 'upcoming' || tab === 'today' || tab === 'overdue') && (
+      {/* Upcoming — dedicated SaaS view */}
+      {tab === 'upcoming' && (
+        <UpcomingFollowUpsView
+          onSchedule={() => setShowForm(true)}
+          onView={setSelected}
+          onEdit={setSelected}
+          onComplete={handleComplete}
+          onReschedule={handleReschedule}
+          onDelete={(id) => {
+            if (window.confirm('Delete this follow-up?')) deleteMutation.mutate(id);
+          }}
+        />
+      )}
+
+      {/* Filters (today / overdue) */}
+      {(tab === 'today' || tab === 'overdue') && (
         <div className="flex flex-wrap items-center gap-3">
           <Input
             placeholder="Search lead or notes..."
@@ -966,7 +1000,7 @@ export const FollowUps: React.FC = () => {
         />
       )}
 
-      {(tab === 'upcoming' || tab === 'today' || tab === 'overdue') && (
+      {(tab === 'today' || tab === 'overdue') && (
         <Card className="overflow-hidden">
           {isLoading ? (
             <div className="p-10 text-center text-xs text-muted-foreground animate-pulse">Loading follow-ups...</div>

@@ -42,9 +42,6 @@ EXPORT_COLUMNS = [
     'Expected Deal Value',
 ]
 
-STATUS_ALLOWED = {'NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL_SENT', 'NEGOTIATION', 'WON', 'LOST'}
-
-
 class IsAdminUserRole(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and hasattr(request.user, 'profile') and request.user.profile.role == 'ADMIN'
@@ -79,7 +76,7 @@ def parse_date_range(filters):
 def apply_export_filters(qs, filters):
     filters = filters or {}
 
-    status_values = [s for s in (filters.get('statuses') or []) if s in STATUS_ALLOWED]
+    status_values = [s for s in (filters.get('statuses') or []) if s]
     if status_values:
         qs = qs.filter(status__in=status_values)
 
@@ -110,6 +107,14 @@ def apply_export_scope(qs, payload):
     if mode in {'ALL', 'COMPLETE_DATASET', 'FILTERED'}:
         return qs
     return qs
+
+
+def build_export_queryset(payload):
+    mode = (payload.get('exportMode') or 'FILTERED').upper()
+    qs = Lead.objects.select_related('owner').all()
+    if mode not in {'ALL', 'COMPLETE_DATASET'}:
+        qs = apply_export_filters(qs, payload.get('filters') or {})
+    return apply_export_scope(qs, payload)
 
 
 def nearest_followup_for_leads(lead_ids):
@@ -233,9 +238,7 @@ class ExportPreviewView(APIView):
     permission_classes = [IsAdminUserRole]
 
     def post(self, request):
-        filters = request.data.get('filters') or {}
-        qs = apply_export_filters(Lead.objects.select_related('owner').all(), filters)
-        qs = apply_export_scope(qs, request.data)
+        qs = build_export_queryset(request.data)
         leads = list(qs.order_by('-created_at')[:5000])
 
         status_counts_qs = qs.values('status').annotate(count=Count('id'))
@@ -261,9 +264,10 @@ class ExportGenerateView(APIView):
         if file_type not in {'csv', 'xlsx', 'pdf'}:
             return Response({'error': 'Unsupported format'}, status=status.HTTP_400_BAD_REQUEST)
 
-        qs = apply_export_filters(Lead.objects.select_related('owner').all(), filters)
-        qs = apply_export_scope(qs, request.data)
+        qs = build_export_queryset(request.data)
         total = qs.count()
+        if total == 0:
+            return Response({'error': 'No leads match the selected export criteria.'}, status=status.HTTP_400_BAD_REQUEST)
         timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
         file_name = f"leads_export_{timestamp}.{file_type}"
 
@@ -316,8 +320,7 @@ class ExportHistoryViewSet(viewsets.ReadOnlyModelViewSet):
         history = self.get_object()
         payload = history.filters_applied or {}
         filters = payload.get('filters') or {}
-        qs = apply_export_filters(Lead.objects.select_related('owner').all(), filters)
-        qs = apply_export_scope(qs, payload)
+        qs = build_export_queryset(payload)
         leads = list(qs.order_by('-created_at')[:20000])
         rows = rows_from_leads(leads)
 

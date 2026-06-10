@@ -122,6 +122,8 @@ class FollowUpSerializer(serializers.ModelSerializer):
     lead_phone = serializers.ReadOnlyField(source='lead.phone')
     lead_email = serializers.ReadOnlyField(source='lead.email')
     lead_source = serializers.ReadOnlyField(source='lead.source')
+    lead_company = serializers.ReadOnlyField(source='lead.company')
+    lead_status = serializers.ReadOnlyField(source='lead.status')
     assigned_agent_details = UserSerializer(source='assigned_agent', read_only=True)
     effective_status = serializers.SerializerMethodField()
     days_overdue = serializers.SerializerMethodField()
@@ -129,7 +131,7 @@ class FollowUpSerializer(serializers.ModelSerializer):
     class Meta:
         model = FollowUp
         fields = [
-            'id', 'lead', 'lead_name', 'lead_phone', 'lead_email', 'lead_source',
+            'id', 'lead', 'lead_name', 'lead_phone', 'lead_email', 'lead_source', 'lead_company', 'lead_status',
             'scheduled_time', 'followup_type', 'priority', 'reminder_time', 'notes',
             'status', 'effective_status', 'days_overdue', 'completed',
             'completed_at', 'completed_by', 'completed_by_name',

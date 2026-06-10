@@ -27,6 +27,7 @@ export const useAuthStore = create<AuthState>((set) => {
   // If we have a token but no usable user object, clear the stale token too
   if (savedToken && !savedUser) {
     localStorage.removeItem('vq_token');
+    localStorage.removeItem('vq_refresh');
   }
 
   if (typeof window !== 'undefined') {
@@ -41,21 +42,43 @@ export const useAuthStore = create<AuthState>((set) => {
     });
   }
 
+  // Stale access token without a refresh token cannot be renewed — clear once on load.
+  if (savedToken && savedUser && !localStorage.getItem('vq_refresh')) {
+    const exp = (() => {
+      try {
+        const payload = JSON.parse(atob(savedToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+      } catch {
+        return null;
+      }
+    })();
+    if (!exp || exp <= Date.now()) {
+      localStorage.removeItem('vq_token');
+      localStorage.removeItem('vq_user');
+    }
+  }
+
+  const initialToken = localStorage.getItem('vq_token');
+  const initialUser = safeParseUser(localStorage.getItem('vq_user'));
+
   return {
-    user: savedUser,
-    token: savedToken && savedUser ? savedToken : null,
-    isAuthenticated: !!savedToken && !!savedUser,
-    
+    user: initialUser,
+    token: initialToken && initialUser ? initialToken : null,
+    isAuthenticated: !!initialToken && !!initialUser,
+
     login: (user, token) => {
       localStorage.setItem('vq_token', token);
       localStorage.setItem('vq_user', JSON.stringify(user));
       set({ user, token, isAuthenticated: true });
+      window.dispatchEvent(new Event('auth_change'));
     },
     
     logout: () => {
       localStorage.removeItem('vq_token');
+      localStorage.removeItem('vq_refresh');
       localStorage.removeItem('vq_user');
       set({ user: null, token: null, isAuthenticated: false });
+      window.dispatchEvent(new Event('auth_change'));
     },
     
     setUser: (user) => {

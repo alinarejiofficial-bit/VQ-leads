@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   BrowserRouter as Router, 
   Routes, 
@@ -6,6 +6,7 @@ import {
   Navigate 
 } from 'react-router-dom';
 import { useAuthStore } from './store';
+import { initAuthSession } from './api';
 
 // Layouts
 import { AdminLayout } from './layouts/AdminLayout';
@@ -69,6 +70,10 @@ const LeaderOrAdminRoute: React.FC<LeaderOrAdminRouteProps> = ({ children }) => 
 function App() {
   const user = useAuthStore(state => state.user);
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+
+  useEffect(() => {
+    initAuthSession();
+  }, []);
 
   return (
     <Router>

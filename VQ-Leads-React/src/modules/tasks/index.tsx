@@ -111,7 +111,7 @@ function TaskForm({
   const [form, setForm] = useState<TaskFormState>({ ...emptyForm(), ...initial });
   const set = (key: keyof TaskFormState, val: any) => setForm(f => ({ ...f, [key]: val }));
 
-  return (
+    return (
     <div className="space-y-3">
       <Input placeholder="Task title *" value={form.title} onChange={e => set('title', e.target.value)} />
       <textarea
@@ -248,7 +248,7 @@ function TaskDrawer({
               className={`py-2 px-3 text-xs font-semibold ${drawerTab === t ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}
             >
               {t.charAt(0).toUpperCase() + t.slice(1)}
-            </button>
+                </button>
           ))}
         </div>
 
@@ -338,8 +338,8 @@ function TaskDrawer({
                   Add Comment
                 </Button>
               </div>
-            </div>
-          )}
+        </div>
+        )}
 
           {drawerTab === 'history' && (
             <div className="space-y-2">
@@ -428,8 +428,8 @@ function CalendarView({ tasks, onSelectTask }: { tasks: Task[]; onSelectTask: (t
               {v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
           ))}
-        </div>
-      </div>
+                </div>
+              </div>
 
       {calView === 'month' && (
         <>
@@ -463,8 +463,8 @@ function CalendarView({ tasks, onSelectTask }: { tasks: Task[]; onSelectTask: (t
                     ))}
                     {dayTasks.length > 3 && (
                       <p className="text-[10px] text-muted-foreground text-center">+{dayTasks.length - 3} more</p>
-                    )}
-                  </div>
+        )}
+      </div>
                 </div>
               );
             })}
