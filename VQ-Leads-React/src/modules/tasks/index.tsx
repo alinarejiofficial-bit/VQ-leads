@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   api, type Lead, type Task, type TaskComment, type TaskHistoryItem,
@@ -511,8 +512,26 @@ type TabKey = typeof TABS[number];
 
 export const TasksPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const searchParams = new URLSearchParams(location.search);
 
-  const [tab, setTab] = useState<TabKey>('all');
+  const tab: TabKey = searchParams.get('view') === 'calendar'
+    ? 'calendar'
+    : (['pending', 'completed'].includes(searchParams.get('filter') || '')
+      ? (searchParams.get('filter') as TabKey)
+      : 'all');
+
+  const setTab = (t: TabKey) => {
+    if (t === 'calendar') {
+      navigate('/tasks?view=calendar');
+    } else if (t === 'all') {
+      navigate('/tasks');
+    } else {
+      navigate(`/tasks?filter=${t}`);
+    }
+  };
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
