@@ -1227,8 +1227,11 @@ export const api = {
   },
 
   // Leads
-  async getLeads(): Promise<Lead[]> {
-    return request<Lead[]>('/leads/');
+  async getLeads(params?: { filter?: string }): Promise<Lead[]> {
+    const query = new URLSearchParams();
+    if (params?.filter) query.set('filter', params.filter);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<Lead[]>(`/leads/${suffix}`);
   },
 
   async searchLeads(query: string): Promise<Lead[]> {

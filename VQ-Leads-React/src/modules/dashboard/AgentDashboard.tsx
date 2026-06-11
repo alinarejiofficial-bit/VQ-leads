@@ -226,7 +226,7 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({ user }) => {
                   <tr
                     key={lead.id}
                     className="border-b border-border/20 hover:bg-muted/20 cursor-pointer transition-colors"
-                    onClick={() => navigate('/leads')}
+                    onClick={() => navigate('/leads?filter=my')}
                   >
                     <td className="px-5 py-3 font-semibold text-foreground">{lead.name}</td>
                     <td className="px-5 py-3 text-muted-foreground">{lead.source}</td>

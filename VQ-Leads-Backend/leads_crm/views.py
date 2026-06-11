@@ -1,5 +1,5 @@
 from rest_framework import viewsets, permissions, status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -512,10 +512,21 @@ class LeadViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user.is_authenticated:
             return Lead.objects.none()
+
+        view_filter = (self.request.query_params.get('filter') or '').strip().lower()
+
         if user.profile.role == 'ADMIN':
             qs = Lead.objects.all()
+        elif view_filter == 'claimed':
+            qs = Lead.objects.filter(owner__isnull=False)
+        elif view_filter == 'converted':
+            qs = Lead.objects.filter(status='WON')
+        elif view_filter == 'lost':
+            qs = Lead.objects.filter(status='LOST')
         else:
             qs = Lead.objects.filter(Q(owner=user) | Q(owner__isnull=True))
+
+        qs = qs.select_related('owner')
 
         search = (self.request.query_params.get('q') or self.request.query_params.get('search') or '').strip()
         if search:
@@ -524,7 +535,21 @@ class LeadViewSet(viewsets.ModelViewSet):
                 filters |= Q(id=int(search))
             qs = qs.filter(filters)
 
+        if view_filter == 'claimed':
+            return qs.order_by('-updated_at')
         return qs.order_by('-created_at')
+
+    def get_object(self):
+        try:
+            return super().get_object()
+        except NotFound:
+            if self.request.user.profile.role == 'ADMIN':
+                raise
+            pk = self.kwargs.get(self.lookup_field, self.kwargs.get('pk'))
+            obj = Lead.objects.filter(pk=pk, owner__isnull=False).select_related('owner').first()
+            if obj is None:
+                raise
+            return obj
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -570,12 +595,15 @@ class LeadViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         lead = self.get_object()
+        user = self.request.user
+        if user.profile.role != 'ADMIN' and lead.owner_id != user.id:
+            raise ValidationError({'error': 'You can only update leads assigned to you.'})
+
         old_status = lead.status
         old_owner = lead.owner
         old_value = lead.value
 
         updated_lead = serializer.save()
-        user = self.request.user
 
         # Track changes and log activities
         changes = []
@@ -597,8 +625,8 @@ class LeadViewSet(viewsets.ModelViewSet):
             # Handle automatic commissions on WON status asynchronously
             if updated_lead.status == 'WON':
                 if updated_lead.owner:
-                    from .tasks import calculate_commission_task
-                    calculate_commission_task.delay(updated_lead.id)
+                    from .tasks import dispatch_commission_calculation
+                    dispatch_commission_calculation(updated_lead.id)
             # If changed away from WON, delete any pending commissions
             elif old_status == 'WON':
                 Commission.objects.filter(lead=updated_lead, status='PENDING').delete()

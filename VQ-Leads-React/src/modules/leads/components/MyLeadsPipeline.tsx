@@ -7,14 +7,14 @@ interface MyLeadsPipelineProps {
   leads: Lead[];
   onStatusChange: (leadId: number, status: string) => void;
   onEdit: (leadId: number) => void;
-  isUpdating?: boolean;
+  updatingLeadId?: number | null;
 }
 
 export const MyLeadsPipeline: React.FC<MyLeadsPipelineProps> = ({
   leads,
   onStatusChange,
   onEdit,
-  isUpdating = false,
+  updatingLeadId = null,
 }) => {
   if (leads.length === 0) return null;
 
@@ -33,7 +33,7 @@ export const MyLeadsPipeline: React.FC<MyLeadsPipelineProps> = ({
             lead={lead}
             onStatusChange={onStatusChange}
             onEdit={onEdit}
-            isUpdating={isUpdating}
+            isUpdating={updatingLeadId === lead.id}
           />
         ))}
       </div>

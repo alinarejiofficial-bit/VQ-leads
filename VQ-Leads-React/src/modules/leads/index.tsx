@@ -18,6 +18,17 @@ interface LeadsProps {
   user: User;
 }
 
+const FILTER_LABELS: Record<string, string> = {
+  available: 'Available Leads',
+  claimed: 'Claimed Leads',
+  my: 'My Leads',
+  converted: 'Converted Leads',
+  lost: 'Lost Leads',
+};
+
+/** Sidebar filters that must use list view (pipeline hides WON/LOST). */
+const LIST_VIEW_FILTERS = new Set(['converted', 'lost', 'claimed', 'available', 'my']);
+
 export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -40,30 +51,59 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   const canClaimLeads = !isAdmin;
 
   useEffect(() => {
-    const q = searchParams.get('q') || '';
-    if (q) setSearch(q);
+    const params = new URLSearchParams(location.search);
+    const q = params.get('q') || '';
+    const filter = params.get('filter');
+    const leadIdParam = params.get('id');
 
-    const leadIdParam = searchParams.get('id');
+    setSearch(q);
+
     if (leadIdParam) {
       const id = parseInt(leadIdParam, 10);
       if (!Number.isNaN(id)) {
         setSelectedLeadId(id);
         setViewMode('list');
       }
+    } else {
+      setSelectedLeadId(null);
     }
 
-    if (!urlFilter && !q && !leadIdParam) {
-      setSearch('');
+    if (filter === 'converted') {
+      setStatusFilter('WON');
+      setSourceFilter('');
+      setOwnerFilter('');
+    } else if (filter === 'lost') {
+      setStatusFilter('LOST');
+      setSourceFilter('');
+      setOwnerFilter('');
+    } else if (filter === 'available') {
+      setStatusFilter('');
+      setSourceFilter('');
+      setOwnerFilter('unassigned');
+    } else if (filter === 'claimed') {
+      setStatusFilter('');
+      setSourceFilter('');
+      setOwnerFilter('');
+    } else if (filter === 'my') {
+      setStatusFilter('');
+      setSourceFilter('');
+      setOwnerFilter(isAdmin ? String(user.id) : '');
+    } else if (!filter && !q && !leadIdParam) {
       setStatusFilter('');
       setSourceFilter('');
       setOwnerFilter('');
     }
-    if (!isAdmin && !leadIdParam) {
-      setViewMode('pipeline');
-    } else if (leadIdParam || isAdmin) {
+
+    if (leadIdParam) {
       setViewMode('list');
+    } else if (isAdmin) {
+      setViewMode('list');
+    } else if (filter && LIST_VIEW_FILTERS.has(filter)) {
+      setViewMode('list');
+    } else {
+      setViewMode('pipeline');
     }
-  }, [location.search, urlFilter, isAdmin, searchParams]);
+  }, [location.search, isAdmin, user.id]);
 
   // Form states for new lead
   const [newLeadName, setNewLeadName] = useState('');
@@ -76,16 +116,20 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
 
   const canClaimLead = (lead: Lead) => canClaimLeads && !lead.owner;
 
-  // React Query fetch
+  const leadsQueryFilter = urlFilter && ['claimed', 'converted', 'lost'].includes(urlFilter)
+    ? urlFilter
+    : undefined;
+
+  // React Query fetch — pass filter to API so agents see org-wide claimed/converted/lost lists
   const { data: leads = [], refetch: refetchLeads } = useQuery<Lead[]>({
-    queryKey: ['leads'],
-    queryFn: api.getLeads,
+    queryKey: ['leads', leadsQueryFilter ?? 'default'],
+    queryFn: () => api.getLeads(leadsQueryFilter ? { filter: leadsQueryFilter } : undefined),
   });
 
   const { data: agents = [] } = useQuery<User[]>({
     queryKey: ['agents'],
     queryFn: api.getAgents,
-    enabled: isAdmin
+    enabled: isAdmin || urlFilter === 'claimed',
   });
 
   // Mutations
@@ -111,11 +155,17 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
 
   const updateLeadMutation = useMutation({
     mutationFn: ({ id, data }: { id: number, data: Partial<Lead> }) => api.updateLead(id, data),
-    onSuccess: () => {
+    onSuccess: (_result, { data }) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
-    }
+      if (data.status === 'WON') {
+        alert('Lead converted successfully!');
+      }
+    },
+    onError: (err: Error) => {
+      alert(err.message || 'Failed to update lead');
+    },
   });
 
   const claimLeadMutation = useMutation({
@@ -124,7 +174,9 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
-      setViewMode('pipeline');
+      if (urlFilter !== 'claimed') {
+        setViewMode('pipeline');
+      }
     },
     onError: (err: Error) => {
       alert(err.message || 'Failed to claim lead');
@@ -174,7 +226,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
     } else if (urlFilter === 'claimed') {
       matchesSidebarFilter = !!l.owner;
     } else if (urlFilter === 'my') {
-      matchesSidebarFilter = l.owner === user.id;
+      matchesSidebarFilter = Number(l.owner) === user.id;
     } else if (urlFilter === 'converted') {
       matchesSidebarFilter = l.status === 'WON';
     } else if (urlFilter === 'lost') {
@@ -185,7 +237,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
   });
 
   const myPipelineLeads = filteredLeads.filter(
-    l => l.owner === user.id && l.status !== 'WON' && l.status !== 'LOST'
+    l => Number(l.owner) === user.id && l.status !== 'WON' && l.status !== 'LOST'
   );
   const pipelineLeads = isAdmin
     ? filteredLeads.filter(l => l.status !== 'WON' && l.status !== 'LOST')
@@ -201,8 +253,29 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
     return <ExportModule leads={leads} filteredLeadIds={filteredLeads.map(l => l.id)} />;
   }
 
+  const activeFilterLabel = urlFilter ? FILTER_LABELS[urlFilter] : null;
+
   return (
     <div className="p-8 space-y-6">
+      {activeFilterLabel && (
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">{activeFilterLabel}</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {filteredLeads.length} lead{filteredLeads.length === 1 ? '' : 's'} found
+              {urlFilter === 'claimed' && ' · claimed by any team member'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/leads')}
+            className="text-xs font-semibold text-primary hover:underline"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
       {/* Header Filters & View Switching */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -240,14 +313,14 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             {sources.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
 
-          {isAdmin && (
+          {(isAdmin || urlFilter === 'claimed') && (
             <select
               className="flex h-10 rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring cursor-pointer"
               value={ownerFilter}
               onChange={e => setOwnerFilter(e.target.value)}
             >
-              <option value="">All Owners</option>
-              <option value="unassigned">Unassigned</option>
+              <option value="">{urlFilter === 'claimed' ? 'All Agents' : 'All Owners'}</option>
+              {isAdmin && <option value="unassigned">Unassigned</option>}
               {agents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
             </select>
           )}
@@ -285,7 +358,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
             leads={pipelineLeads}
             onStatusChange={moveLeadStatus}
             onEdit={setSelectedLeadId}
-            isUpdating={updateLeadMutation.isPending}
+            updatingLeadId={updateLeadMutation.isPending ? updateLeadMutation.variables?.id ?? null : null}
           />
           {pipelineLeads.length === 0 && (
             <div className="text-center text-muted-foreground py-12 border border-dashed border-border/60 rounded-xl">
@@ -326,7 +399,7 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                 <TableHead>Company</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Value</TableHead>
-                <TableHead>Owner</TableHead>
+                <TableHead>{urlFilter === 'claimed' ? 'Claimed By' : 'Owner'}</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
                 {canClaimLeads && <TableHead>Actions</TableHead>}
@@ -346,7 +419,16 @@ export const Leads: React.FC<LeadsProps> = ({ user }) => {
                     <TableCell>{l.company || '-'}</TableCell>
                     <TableCell>{l.source}</TableCell>
                     <TableCell className="font-semibold">${l.value}</TableCell>
-                    <TableCell><OwnerLabel name={l.owner_name} ownerId={l.owner} /></TableCell>
+                    <TableCell>
+                      {urlFilter === 'claimed' ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <UserCheck size={14} className="text-primary shrink-0" />
+                          <OwnerLabel name={l.owner_name} ownerId={l.owner} className="font-semibold" />
+                        </span>
+                      ) : (
+                        <OwnerLabel name={l.owner_name} ownerId={l.owner} />
+                      )}
+                    </TableCell>
                     <TableCell>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${l.status === 'NEW' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
                           l.status === 'CONTACTED' ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' :

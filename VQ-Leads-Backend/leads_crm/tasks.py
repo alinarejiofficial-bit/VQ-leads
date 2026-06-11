@@ -9,6 +9,27 @@ from .models import Lead, LeadActivity, Commission
 
 logger = logging.getLogger(__name__)
 
+
+def dispatch_commission_calculation(lead_id):
+    """Queue commission calculation; fall back to sync if Celery/Redis is unavailable."""
+    try:
+        calculate_commission_task.delay(lead_id)
+    except Exception as exc:
+        logger.warning(
+            "Celery unavailable for lead %s commission task, running synchronously: %s",
+            lead_id,
+            exc,
+        )
+        try:
+            calculate_commission_task(lead_id)
+        except Exception as sync_exc:
+            logger.exception(
+                "Sync commission calculation failed for lead %s: %s",
+                lead_id,
+                sync_exc,
+            )
+
+
 @shared_task
 def assign_lead_round_robin_task(lead_id):
     logger.info(f"Starting async round-robin assignment for Lead ID: {lead_id}")
